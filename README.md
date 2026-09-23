@@ -1,4 +1,4 @@
-# ITMDA3- 34 Project-project
-SafeSense: Intelligent Community-Based Crime Reporting and Alert System for South Africa
+SafeSense-project
+ITMDA3- 34 Project: Intelligent Community-Based Crime Reporting and Alert System for South Africa
 
 
