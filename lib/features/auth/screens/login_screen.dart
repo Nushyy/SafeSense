@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../reporting/screens/report_incident_screen.dart';
 
 import 'register_screen.dart';
 
@@ -43,14 +43,10 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-    if (response.user != null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const ReportIncidentScreen(),
-        ),
-      );
-    }
+      // Successful login now opens the Home dashboard.
+      if (response.user != null) {
+        context.go('/home');
+      }
     } on AuthException catch (error) {
       if (!mounted) {
         return;
@@ -104,12 +100,12 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-              Image.asset(
+                Image.asset(
                   'assets/images/safesense_logo.png',
-                width: 220,
-                height: 180,
-                fit: BoxFit.contain,
-              ),
+                  width: 220,
+                  height: 180,
+                  fit: BoxFit.contain,
+                ),
 
                 const SizedBox(height: 16),
 

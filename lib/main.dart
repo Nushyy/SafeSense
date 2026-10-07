@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'features/auth/screens/login_screen.dart';
-
+import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 
 Future<void> main() async {
@@ -24,11 +23,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'SafeSense',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const LoginScreen(),
+      routerConfig: AppRouter.router,
     );
   }
 }
