@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/reporting/screens/report_incident_screen.dart';
+import '../../features/reporting/screens/my_reports_screen.dart';
 import '../../screens/Home/home_screen.dart';
 import '../../screens/profile/profile_screen.dart';
 
@@ -29,6 +30,11 @@ class AppRouter {
       GoRoute(
         path: '/report',
         builder: (context, state) => const ReportIncidentScreen(),
+      ),
+
+      GoRoute(
+        path: '/my-reports',
+        builder: (context, state) => const MyReportsScreen(),
       ),
 
       GoRoute(
