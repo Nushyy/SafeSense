@@ -1,121 +1,108 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
-
 class EmergencyContactsScreen extends StatefulWidget {
   const EmergencyContactsScreen({super.key});
 
   @override
-  State<EmergencyContactsScreen> createState() =>
-      _EmergencyContactsScreenState();
+  State<EmergencyContactsScreen> createState() => _EmergencyContactsScreenState();
 }
 
-class _EmergencyContactsScreenState
-    extends State<EmergencyContactsScreen> {
-  final List<Map<String, String>> contacts = [
-    {
-      'name': 'Mom',
-      'phone': '082 555 0012',
-      'relationship': 'Mother',
-    },
-  ];
+class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
+  final List<Map<String, String>> contacts = [];
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
-
-      appBar: AppBar(
-        title: const Text(
-          'Emergency Contacts',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-      ),
-
+      appBar: AppBar(title: const Text('Emergency Contacts')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const Center(
-            child: Text(
-              'YOUR EMERGENCY CONTACTS',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.4,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          const Text(
-            'These contacts can be used when you need assistance.',
+          Text(
+            'YOUR EMERGENCY CONTACTS',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: colors.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
             ),
           ),
-
+          const SizedBox(height: 10),
+          Text(
+            'Keep important people easy to find when you need assistance.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 20),
-
-          ...contacts.asMap().entries.map(
-                (entry) => _contactCard(
-                  entry.key,
-                  entry.value,
+          if (contacts.isEmpty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Icon(Icons.contact_phone_outlined,
+                        size: 42, color: colors.onSurfaceVariant),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No emergency contacts added',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Add a trusted contact below. Contacts currently remain on this screen only and are not saved to Supabase.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-
+            )
+          else
+            ...contacts.asMap().entries.map(
+              (entry) => _contactCard(context, entry.key, entry.value),
+            ),
           const SizedBox(height: 10),
-
           SizedBox(
             height: 52,
-            child: ElevatedButton.icon(
+            child: FilledButton.icon(
               onPressed: _addContact,
               icon: const Icon(Icons.person_add_alt_1),
-              label: const Text('Add Emergency Contact'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
+              label: const Text('Add emergency contact'),
             ),
           ),
-
-          const SizedBox(height: 25),
-
+          const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.06),
+              color: colors.errorContainer,
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const Column(
+            child: Column(
               children: [
-                Icon(
-                  Icons.warning_amber_outlined,
-                  color: AppColors.danger,
-                ),
-                SizedBox(height: 8),
+                Icon(Icons.warning_amber_outlined, color: colors.onErrorContainer),
+                const SizedBox(height: 8),
                 Text(
                   'Emergency services',
-                  style: TextStyle(
+                  style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: colors.onErrorContainer,
                   ),
                 ),
-                SizedBox(height: 5),
+                const SizedBox(height: 5),
                 Text(
-                  'For immediate danger, use the emergency services provided by SafeSense.',
+                  'If you are in immediate danger, contact the appropriate emergency service directly.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onErrorContainer,
                   ),
                 ),
               ],
@@ -127,136 +114,104 @@ class _EmergencyContactsScreenState
   }
 
   Widget _contactCard(
+    BuildContext context,
     int index,
     Map<String, String> contact,
   ) {
-    return Container(
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 25,
-            backgroundColor: Colors.red.withOpacity(0.08),
-            child: const Icon(
-              Icons.person_outline,
-              color: AppColors.danger,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          backgroundColor: colors.errorContainer,
+          child: Icon(Icons.person_outline, color: colors.onErrorContainer),
+        ),
+        title: Text(
+          contact['name']!,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            '${contact['phone']!} • ${contact['relationship']!}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
             ),
           ),
-
-          const SizedBox(width: 14),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  contact['name']!,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  contact['phone']!,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  contact['relationship']!,
-                  style: const TextStyle(
-                    color: AppColors.primaryBlue,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          IconButton(
-            onPressed: () {
-              setState(() {
-                contacts.removeAt(index);
-              });
-            },
-            icon: const Icon(
-              Icons.delete_outline,
-              color: AppColors.danger,
-            ),
-          ),
-        ],
+        ),
+        trailing: IconButton(
+          tooltip: 'Delete contact',
+          onPressed: () => setState(() => contacts.removeAt(index)),
+          icon: Icon(Icons.delete_outline, color: colors.error),
+        ),
       ),
     );
   }
 
-  void _addContact() {
+  Future<void> _addContact() async {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
     final relationshipController = TextEditingController();
 
-    showDialog(
+    final result = await showDialog<Map<String, String>>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Add Emergency Contact'),
-          content: SingleChildScrollView(
-            child: Column(
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Name',
-                  ),
-                ),
-                TextField(
-                  controller: phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone Number',
-                  ),
-                ),
-                TextField(
-                  controller: relationshipController,
-                  decoration: const InputDecoration(
-                    labelText: 'Relationship',
-                  ),
-                ),
-              ],
-            ),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Add emergency contact'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Name'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'Phone number'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: relationshipController,
+                decoration: const InputDecoration(labelText: 'Relationship'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (nameController.text.trim().isNotEmpty &&
-                    phoneController.text.trim().isNotEmpty) {
-                  setState(() {
-                    contacts.add({
-                      'name': nameController.text.trim(),
-                      'phone': phoneController.text.trim(),
-                      'relationship':
-                          relationshipController.text.trim(),
-                    });
-                  });
-                }
-
-                Navigator.pop(context);
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final name = nameController.text.trim();
+              final phone = phoneController.text.trim();
+              if (name.isEmpty || phone.isEmpty) return;
+              Navigator.pop(dialogContext, {
+                'name': name,
+                'phone': phone,
+                'relationship': relationshipController.text.trim().isEmpty
+                    ? 'Contact'
+                    : relationshipController.text.trim(),
+              });
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
     );
+
+    nameController.dispose();
+    phoneController.dispose();
+    relationshipController.dispose();
+
+    if (result != null && mounted) {
+      setState(() => contacts.add(result));
+    }
   }
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
 
 class ProfileMenuItem extends StatelessWidget {
   final IconData icon;
@@ -19,33 +18,22 @@ class ProfileMenuItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color itemColor =
-        isDanger ? AppColors.danger : AppColors.textPrimary;
-
+    final colors = Theme.of(context).colorScheme;
+    final itemColor = isDanger ? colors.error : colors.onSurface;
+    
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 4,
-      ),
-
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       leading: Container(
         width: 42,
         height: 42,
         decoration: BoxDecoration(
           color: isDanger
-              ? AppColors.danger.withOpacity(0.1)
-              : AppColors.lightBlue,
+              ? colors.errorContainer
+              : colors.primaryContainer,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(
-          icon,
-          color: isDanger
-              ? AppColors.danger
-              : AppColors.primaryBlue,
-          size: 22,
-        ),
+        child: Icon(icon, color: isDanger ? colors.onErrorContainer : colors.onPrimaryContainer, size: 22),
       ),
-
       title: Text(
         title,
         style: TextStyle(
@@ -54,24 +42,18 @@ class ProfileMenuItem extends StatelessWidget {
           fontWeight: FontWeight.w600,
         ),
       ),
-
-      subtitle: subtitle != null
-          ? Text(
+      subtitle: subtitle == null
+          ? null
+          : Text(
               subtitle!,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
+              style: TextStyle(
+                color: colors.onSurfaceVariant,
                 fontSize: 13,
               ),
-            )
-          : null,
-
+            ),
       trailing: isDanger
           ? null
-          : const Icon(
-              Icons.chevron_right,
-              color: AppColors.textSecondary,
-            ),
-
+          : Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
       onTap: onTap,
     );
   }

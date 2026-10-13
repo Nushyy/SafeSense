@@ -1,262 +1,249 @@
 import 'package:flutter/material.dart';
 
-import '../../models/profile_data.dart';
-import '../../theme/app_colors.dart';
+import '../../services/profile_repository.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
 
   @override
-  State<EditProfileScreen> createState() =>
-      _EditProfileScreenState();
+  State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  late TextEditingController usernameController;
-  late TextEditingController townController;
-  late TextEditingController bioController;
+  final _formKey = GlobalKey<FormState>();
+  final _fullNameController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _neighborhoodController = TextEditingController();
+
+  bool _loading = true;
+  bool _saving = false;
+  String? _loadError;
 
   @override
   void initState() {
     super.initState();
-
-    usernameController =
-        TextEditingController(text: ProfileData.username);
-
-    townController =
-        TextEditingController(text: ProfileData.town);
-
-    bioController =
-        TextEditingController(text: ProfileData.bio);
+    _loadProfile();
   }
 
   @override
   void dispose() {
-    usernameController.dispose();
-    townController.dispose();
-    bioController.dispose();
+    _fullNameController.dispose();
+    _usernameController.dispose();
+    _phoneController.dispose();
+    _neighborhoodController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await ProfileRepository.loadCurrentProfile();
+      if (!mounted) return;
+
+      _fullNameController.text = profile.fullName;
+      _usernameController.text = profile.username;
+      _phoneController.text = profile.phoneNumber;
+      _neighborhoodController.text = profile.neighborhood;
+
+      setState(() {
+        _loading = false;
+        _loadError = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = error.toString().replaceFirst('Bad state: ', '');
+      });
+    }
+  }
+
+  Future<void> _save() async {
+    FocusScope.of(context).unfocus();
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _saving = true);
+    try {
+      await ProfileRepository.saveCurrentProfile(
+        fullName: _fullNameController.text,
+        username: _usernameController.text,
+        phoneNumber: _phoneController.text,
+        neighborhood: _neighborhoodController.text,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated successfully.')),
+      );
+      Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      final message = error.toString()
+          .replaceFirst('Exception: ', '')
+          .replaceFirst('Bad state: ', '')
+          .replaceFirst('Invalid argument(s): ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
-
-      appBar: AppBar(
-        title: const Text(
-          'Edit Profile',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-      ),
-
-      body: ListView(
-        padding: const EdgeInsets.all(22),
-        children: [
-          Center(
-            child: Stack(
-              children: [
-                CircleAvatar(
-                  radius: 52,
-                  backgroundColor: AppColors.lightBlue,
-                  child: Text(
-                    ProfileData.initials,
-                    style: const TextStyle(
-                      color: AppColors.primaryBlue,
-                      fontSize: 27,
-                      fontWeight: FontWeight.bold,
+      appBar: AppBar(title: const Text('Edit Profile')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _loadError != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.cloud_off_outlined, size: 42),
+                        const SizedBox(height: 12),
+                        Text(_loadError!, textAlign: TextAlign.center),
+                        const SizedBox(height: 16),
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _loading = true;
+                              _loadError = null;
+                            });
+                            _loadProfile();
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Try again'),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primaryBlue,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt_outlined,
-                      color: Colors.white,
-                      size: 18,
-                    ),
+                )
+              : Form(
+                  key: _formKey,
+                  child: ListView(
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: colors.surface,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: colors.outlineVariant),
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 30,
+                              backgroundColor: colors.primaryContainer,
+                              child: Icon(
+                                Icons.person_outline,
+                                color: colors.onPrimaryContainer,
+                                size: 30,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Your account details',
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Changes are saved to your SafeSense profile.',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      TextFormField(
+                        controller: _fullNameController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'Full name',
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                        validator: (value) => value == null || value.trim().isEmpty
+                            ? 'Enter your full name.'
+                            : null,
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _usernameController,
+                        autocorrect: false,
+                        decoration: const InputDecoration(
+                          labelText: 'Username',
+                          prefixIcon: Icon(Icons.alternate_email),
+                          helperText: '3–30 letters, numbers, underscores or periods.',
+                        ),
+                        validator: (value) {
+                          final username = (value ?? '').trim().replaceFirst(
+                                RegExp(r'^@'),
+                                '',
+                              );
+                          if (!RegExp(r'^[a-zA-Z0-9_.]{3,30}$')
+                              .hasMatch(username)) {
+                            return 'Enter a valid username (3–30 characters).';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'Phone number',
+                          prefixIcon: Icon(Icons.phone_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _neighborhoodController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'Town / neighbourhood',
+                          prefixIcon: Icon(Icons.location_on_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        height: 52,
+                        child: FilledButton.icon(
+                          onPressed: _saving ? null : _save,
+                          icon: _saving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.save_outlined),
+                          label: Text(_saving ? 'Saving…' : 'Save changes'),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 30),
-
-          const Center(
-            child: Text(
-              'PROFILE PREFERENCES',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.4,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 18),
-
-          _buildField(
-            controller: usernameController,
-            label: 'Username',
-            icon: Icons.alternate_email,
-          ),
-
-          const SizedBox(height: 16),
-
-          _buildField(
-            controller: townController,
-            label: 'Town / Location',
-            icon: Icons.location_on_outlined,
-          ),
-
-          const SizedBox(height: 16),
-
-          _buildField(
-            controller: bioController,
-            label: 'Bio',
-            icon: Icons.edit_note_outlined,
-            maxLines: 3,
-          ),
-
-          const SizedBox(height: 30),
-
-          const Center(
-            child: Text(
-              'ACCOUNT DETAILS',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.4,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Column(
-              children: [
-                _readOnlyRow(
-                  'Name',
-                  ProfileData.fullName,
-                ),
-                const Divider(),
-                _readOnlyRow(
-                  'Email',
-                  ProfileData.email,
-                ),
-                const Divider(),
-                _readOnlyRow(
-                  'Phone',
-                  ProfileData.phoneNumber,
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 30),
-
-          SizedBox(
-            height: 52,
-            child: ElevatedButton(
-              onPressed: _saveProfile,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: const Text(
-                'Save Changes',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
-  }
-
-  Widget _buildField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    int maxLines = 1,
-  }) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
-      ),
-    );
-  }
-
-  Widget _readOnlyRow(String title, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _saveProfile() {
-    ProfileData.username = usernameController.text.trim();
-    ProfileData.town = townController.text.trim();
-    ProfileData.bio = bioController.text.trim();
-
-    Navigator.pop(context);
   }
 }

@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
+import 'app_theme.dart';
+
+/// Compatibility facade for older screens. There is one source of truth:
+/// AppThemeController, which also persists the preference.
 class ThemeController {
-  static final ValueNotifier<ThemeMode> themeMode =
-      ValueNotifier<ThemeMode>(ThemeMode.light);
+  static ValueNotifier<ThemeMode> get themeMode =>
+      AppThemeController.themeMode;
 
   static bool get isDarkMode =>
-      themeMode.value == ThemeMode.dark;
+      AppThemeController.themeMode.value == ThemeMode.dark;
 
-  static void toggleDarkMode(bool enabled) {
-    themeMode.value =
-        enabled ? ThemeMode.dark : ThemeMode.light;
-  }
+  static Future<void> toggleDarkMode(bool enabled) =>
+      AppThemeController.setDarkMode(enabled);
 }
