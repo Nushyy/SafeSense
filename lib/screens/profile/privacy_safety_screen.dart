@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
-
 class PrivacySafetyScreen extends StatefulWidget {
   const PrivacySafetyScreen({super.key});
 
   @override
-  State<PrivacySafetyScreen> createState() =>
-      _PrivacySafetyScreenState();
+  State<PrivacySafetyScreen> createState() => _PrivacySafetyScreenState();
 }
 
-class _PrivacySafetyScreenState
-    extends State<PrivacySafetyScreen> {
+class _PrivacySafetyScreenState extends State<PrivacySafetyScreen> {
   bool anonymousReporting = true;
   bool approximateLocation = true;
   bool profileVisibility = false;
@@ -19,99 +15,70 @@ class _PrivacySafetyScreenState
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
-
-      appBar: AppBar(
-        title: const Text(
-          'Privacy & Safety',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-      ),
-
+      appBar: AppBar(title: const Text('Privacy & Safety')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const Center(
-            child: Text(
-              'PRIVACY SETTINGS',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.4,
-                color: AppColors.textSecondary,
-              ),
+          Text(
+            'PRIVACY SETTINGS',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: colors.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
             ),
           ),
-
-          const SizedBox(height: 12),
-
+          const SizedBox(height: 16),
           _setting(
+            context,
             title: 'Anonymous Reporting',
-            subtitle:
-                'Allow reports to be submitted without publicly displaying your identity',
+            subtitle: 'Allow reports to be submitted without publicly displaying your identity',
             value: anonymousReporting,
-            onChanged: (value) {
-              setState(() => anonymousReporting = value);
-            },
+            onChanged: (value) => setState(() => anonymousReporting = value),
           ),
-
           _setting(
+            context,
             title: 'Approximate Location',
-            subtitle:
-                'Use an approximate area instead of your exact location when appropriate',
+            subtitle: 'Use an approximate area instead of your exact location when appropriate',
             value: approximateLocation,
-            onChanged: (value) {
-              setState(() => approximateLocation = value);
-            },
+            onChanged: (value) => setState(() => approximateLocation = value),
           ),
-
           _setting(
+            context,
             title: 'Profile Visibility',
-            subtitle:
-                'Allow other community members to see your public profile',
+            subtitle: 'Allow other community members to see your public profile',
             value: profileVisibility,
-            onChanged: (value) {
-              setState(() => profileVisibility = value);
-            },
+            onChanged: (value) => setState(() => profileVisibility = value),
           ),
-
           _setting(
+            context,
             title: 'Trusted Circle Location',
-            subtitle:
-                'Allow members of your trusted circle to receive your shared location',
+            subtitle: 'Allow members of your trusted circle to receive your shared location',
             value: trustedCircleLocation,
-            onChanged: (value) {
-              setState(() => trustedCircleLocation = value);
-            },
+            onChanged: (value) => setState(() => trustedCircleLocation = value),
           ),
-
-          const SizedBox(height: 18),
-
+          const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: AppColors.lightBlue,
+              color: colors.primaryContainer,
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.security_outlined,
-                  color: AppColors.primaryBlue,
-                ),
-                SizedBox(width: 12),
+                Icon(Icons.security_outlined, color: colors.onPrimaryContainer),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'SafeSense is designed to give you control over what information you share and who you share it with.',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 13,
-                      height: 1.4,
+                    'These controls are currently UI preferences. They must be connected to reporting, location-sharing and privacy logic before they change how data is processed.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onPrimaryContainer,
+                      height: 1.45,
                     ),
                   ),
                 ),
@@ -123,36 +90,26 @@ class _PrivacySafetyScreenState
     );
   }
 
-  Widget _setting({
+  Widget _setting(
+    BuildContext context, {
     required String title,
     required String subtitle,
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return Container(
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
       child: SwitchListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 7,
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Text(
             subtitle,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 12,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
               height: 1.4,
             ),
           ),
