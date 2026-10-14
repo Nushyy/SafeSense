@@ -1,124 +1,124 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+// Community
+import '../../community/bulletin_board_screen.dart';
+
+// Authentication
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
+
+// Crime Reporting
 import '../../features/reporting/screens/report_incident_screen.dart';
 import '../../features/reporting/screens/my_reports_screen.dart';
+
+// Home
 import '../../screens/Home/home_screen.dart';
+
+// Map
+import '../../screens/map/crime_map_screen.dart';
+
+// Profile
 import '../../screens/profile/profile_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/login',
     routes: [
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      // Authentication
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
 
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
       ),
 
-      GoRoute(
-        path: '/home',
-        builder: (context, state) => const HomeScreen(),
-      ),
+      // Home Dashboard
+      GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
 
+      // Crime Reporting
       GoRoute(
         path: '/report',
         builder: (context, state) => const ReportIncidentScreen(),
       ),
 
+      // My Reports
       GoRoute(
         path: '/my-reports',
         builder: (context, state) => const MyReportsScreen(),
       ),
 
+      // User Profile
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
       ),
 
-      // Features that are not integrated yet.
+      // Crime Map
       GoRoute(
         path: '/map',
-        builder: (context, state) => const ComingSoonScreen(
-          title: 'Map',
-        ),
+        builder: (context, state) => const CrimeMapScreen(),
       ),
 
+      // Community Bulletin Board
       GoRoute(
         path: '/alerts',
-        builder: (context, state) => const ComingSoonScreen(
-          title: 'Community Alerts',
-        ),
+        builder: (context, state) => const BulletinBoardScreen(),
       ),
 
+      // Safe Routes
       GoRoute(
         path: '/safe-route',
-        builder: (context, state) => const ComingSoonScreen(
-          title: 'Safe Routes',
-        ),
+        builder: (context, state) =>
+            const ComingSoonScreen(title: 'Safe Routes'),
       ),
 
+      // Emergency Contacts
       GoRoute(
         path: '/emergency-contacts',
-        builder: (context, state) => const ComingSoonScreen(
-          title: 'Emergency Contacts',
-        ),
+        builder: (context, state) =>
+            const ComingSoonScreen(title: 'Emergency Contacts'),
       ),
 
+      // Settings
       GoRoute(
         path: '/settings',
-        builder: (context, state) => const ComingSoonScreen(
-          title: 'Settings',
-        ),
+        builder: (context, state) => const ComingSoonScreen(title: 'Settings'),
       ),
 
+      // Language Settings
       GoRoute(
         path: '/settings/language',
-        builder: (context, state) => const ComingSoonScreen(
-          title: 'Language',
-        ),
+        builder: (context, state) => const ComingSoonScreen(title: 'Language'),
       ),
 
+      // Help
       GoRoute(
         path: '/help',
-        builder: (context, state) => const ComingSoonScreen(
-          title: 'Help / SOS Information',
-        ),
+        builder: (context, state) =>
+            const ComingSoonScreen(title: 'Help / SOS Information'),
       ),
     ],
   );
 }
 
+// Placeholder for features awaiting integration
 class ComingSoonScreen extends StatelessWidget {
-  const ComingSoonScreen({
-    super.key,
-    required this.title,
-  });
+  const ComingSoonScreen({super.key, required this.title});
 
   final String title;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-      ),
+      appBar: AppBar(title: Text(title)),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.construction_outlined,
-                size: 64,
-              ),
+              const Icon(Icons.construction_outlined, size: 64),
               const SizedBox(height: 16),
               Text(
                 title,
