@@ -1,69 +1,183 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
+import '../../../services/sos/sos_service.dart';
 import '../../../theme/colors.dart';
 import '../../../theme/spacing.dart';
 
-/// The SOS button. Long-press (not tap) to reduce accidental triggers.
-class SosButton extends StatelessWidget {
+/// The SOS button. Hold for 0.6 seconds and the alert is sent
+/// immediately, then the "SOS sent" screen opens with Call 112 and a
+/// cancel option. A progress ring fills while holding, so the user can
+/// see it working, and releasing early cancels the hold.
+class SosButton extends StatefulWidget {
   const SosButton({super.key});
 
-  Future<void> _triggerSos(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Send SOS alert?'),
-        content: const Text(
-          'This will notify nearby community responders and police of '
-          'your current location.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Send SOS'),
-          ),
-        ],
-      ),
-    );
+  @override
+  State<SosButton> createState() => _SosButtonState();
+}
 
-    if (confirmed == true && context.mounted) {
-      // TODO(alerts-owner): replace with a real call to send the alert.
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('SOS alert sent to nearby responders'),
-          backgroundColor: AppColors.danger,
-        ),
-      );
-    }
+class _SosButtonState extends State<SosButton> with TickerProviderStateMixin {
+  static const double _size = 170;
+  static const Duration _holdDuration = Duration(milliseconds: 600);
+
+  late final AnimationController _pulse;
+  late final AnimationController _hold;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
+
+    _hold = AnimationController(vsync: this, duration: _holdDuration)
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed) _sendNow();
+      });
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    _hold.dispose();
+    super.dispose();
+  }
+
+  void _startHold() {
+    HapticFeedback.selectionClick();
+    _hold.forward();
+  }
+
+  void _cancelHold() {
+    if (_hold.status != AnimationStatus.completed) _hold.reverse();
+  }
+
+  Future<void> _sendNow() async {
+    HapticFeedback.heavyImpact();
+    _hold.reset();
+    await SosService.instance.sendAlert(trigger: 'button');
+    if (!mounted) return;
+    context.push('/sos-sent');
   }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        GestureDetector(
-          onLongPress: () => _triggerSos(context),
-          child: Container(
-            width: 100,
-            height: 100,
-            decoration: const BoxDecoration(color: AppColors.danger, shape: BoxShape.circle),
-            alignment: Alignment.center,
-            child: const Text(
-              'SOS',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-            ),
+        SizedBox(
+          width: _size + 70,
+          height: _size + 70,
+          child: AnimatedBuilder(
+            animation: Listenable.merge([_pulse, _hold]),
+            builder: (context, _) {
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  for (final offset in const [0.0, 0.5])
+                    _PulseRing(
+                      progress: (_pulse.value + offset) % 1.0,
+                      size: _size,
+                    ),
+                  Semantics(
+                    button: true,
+                    label: 'Emergency SOS. Press and hold for half a second '
+                        'to send an alert immediately.',
+                    child: GestureDetector(
+                      onTapDown: (_) => _startHold(),
+                      onTapUp: (_) => _cancelHold(),
+                      onTapCancel: _cancelHold,
+                      child: Container(
+                        width: _size,
+                        height: _size,
+                        decoration: BoxDecoration(
+                          color: AppColors.danger,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.danger.withValues(alpha: 0.45),
+                              blurRadius: 24,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            SizedBox(
+                              width: _size - 16,
+                              height: _size - 16,
+                              child: CircularProgressIndicator(
+                                value: _hold.value,
+                                strokeWidth: 7,
+                                color: Colors.white,
+                                backgroundColor: Colors.white24,
+                              ),
+                            ),
+                            const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'SOS',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 40,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                                Text(
+                                  'HOLD',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.xs),
         Text(
-          'Press and hold to alert nearest community responders and police',
+          'Hold for half a second to alert nearest community responders '
+          'and police',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
+    );
+  }
+}
+
+/// One expanding, fading ring behind the button.
+class _PulseRing extends StatelessWidget {
+  const _PulseRing({required this.progress, required this.size});
+
+  final double progress;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.scale(
+      scale: 1 + 0.4 * progress,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.danger.withValues(alpha: 0.3 * (1 - progress)),
+        ),
+      ),
     );
   }
 }
