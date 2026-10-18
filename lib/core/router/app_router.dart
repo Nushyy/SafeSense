@@ -15,6 +15,9 @@ import '../../features/reporting/screens/my_reports_screen.dart';
 // Home
 import '../../screens/Home/home_screen.dart';
 
+// Splash Screen
+import '../../screens/Splash/splash_screen.dart';
+
 // Map
 import '../../screens/map/crime_map_screen.dart';
 
@@ -23,8 +26,16 @@ import '../../screens/profile/profile_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
-    initialLocation: '/login',
+    // Start the application with the Splash Screen
+    initialLocation: '/splash',
+
     routes: [
+      // Splash Screen
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+
       // Authentication
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
 
