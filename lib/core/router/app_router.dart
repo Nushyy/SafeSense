@@ -18,6 +18,10 @@ import '../../screens/Home/home_screen.dart';
 // Splash Screen
 import '../../screens/Splash/splash_screen.dart';
 
+// SOS
+import '../../navigation/root_navigator_key.dart';
+import '../../screens/Sos/sos_sent_screen.dart';
+
 // Map
 import '../../screens/map/crime_map_screen.dart';
 
@@ -26,7 +30,7 @@ import '../../screens/profile/profile_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
-    // Start the application with the Splash Screen
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
 
     routes: [
@@ -46,6 +50,12 @@ class AppRouter {
 
       // Home Dashboard
       GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
+
+      // SOS Prototype
+      GoRoute(
+        path: '/sos-sent',
+        builder: (context, state) => const SosSentScreen(),
+      ),
 
       // Crime Reporting
       GoRoute(
