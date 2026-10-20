@@ -7,6 +7,8 @@ import '../../community/bulletin_board_screen.dart';
 // Authentication
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
+import '../../features/auth/screens/forgot_password_screen.dart';
+import '../../features/auth/screens/reset_password_screen.dart';
 
 // Crime Reporting
 import '../../features/reporting/screens/report_incident_screen.dart';
@@ -32,7 +34,6 @@ class AppRouter {
   static final GoRouter router = GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
-
     routes: [
       // Splash Screen
       GoRoute(
@@ -46,6 +47,18 @@ class AppRouter {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+
+      // Forgot Password
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+
+      // Reset Password
+      GoRoute(
+        path: '/reset-password',
+        builder: (context, state) => const ResetPasswordScreen(),
       ),
 
       // Home Dashboard
@@ -123,7 +136,6 @@ class AppRouter {
   );
 }
 
-// Placeholder for features awaiting integration
 class ComingSoonScreen extends StatelessWidget {
   const ComingSoonScreen({super.key, required this.title});
 

@@ -1,8 +1,7 @@
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,10 +17,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
 
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   Future<void> _login() async {
-    // Validate the form before contacting Supabase.
-    if (!_formKey.currentState!.validate()) {
+    if (_isLoading || !_formKey.currentState!.validate()) {
       return;
     }
 
@@ -39,28 +38,21 @@ class _LoginScreenState extends State<LoginScreen> {
         password: password,
       );
 
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
-      // Successful login now opens the Home dashboard.
       if (response.user != null) {
         context.go('/home');
       }
     } on AuthException catch (error) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error.message),
         ),
       );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
+    } catch (_) {
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -82,7 +74,6 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-
     super.dispose();
   }
 
@@ -101,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Image.asset(
-                  'assets/images/safesense_logo.png',
+                  'assets/images/logo_mark.png',
                   width: 220,
                   height: 180,
                   fit: BoxFit.contain,
@@ -126,10 +117,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 32),
 
-                // Email
+                // Email address
                 TextFormField(
                   controller: _emailController,
+                  enabled: !_isLoading,
                   keyboardType: TextInputType.emailAddress,
+                  autofillHints: const [
+                    AutofillHints.email,
+                  ],
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     hintText: 'Enter your email address',
@@ -160,12 +155,33 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Password
                 TextFormField(
                   controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
+                  enabled: !_isLoading,
+                  obscureText: _obscurePassword,
+                  autofillHints: const [
+                    AutofillHints.password,
+                  ],
+                  decoration: InputDecoration(
                     labelText: 'Password',
                     hintText: 'Enter your password',
-                    prefixIcon: Icon(Icons.lock_outline),
-                    border: OutlineInputBorder(),
+                    prefixIcon: const Icon(
+                      Icons.lock_outline,
+                    ),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      tooltip: _obscurePassword
+                          ? 'Show password'
+                          : 'Hide password',
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -176,9 +192,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   },
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
 
-                // Login Button
+                // Forgot Password navigation
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _isLoading
+                        ? null
+                        : () => context.push('/forgot-password'),
+                    child: const Text(
+                      'Forgot Password?',
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Login button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -201,15 +232,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   "Don't have an account?",
                 ),
 
+                // Registration navigation
                 TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const RegisterScreen(),
-                      ),
-                    );
-                  },
+                  onPressed: _isLoading
+                      ? null
+                      : () => context.push('/register'),
                   child: const Text('Create an account'),
                 ),
               ],
