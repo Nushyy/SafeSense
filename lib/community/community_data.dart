@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
@@ -68,6 +69,48 @@ extension PostCategoryInfo on PostCategory {
       };
 }
 
+enum AttachmentType { picture, document }
+
+/// "12 KB" / "3.4 MB"
+String formatFileSize(int bytes) {
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).ceil()} KB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
+
+/// The one picture or document a post can have.
+/// While we use dummy data the file is kept in memory. With Supabase this
+/// becomes a Storage URL instead of [bytes].
+class PostAttachment {
+  final AttachmentType type;
+  final String name;
+  final int sizeBytes;
+  final Uint8List bytes;
+  const PostAttachment({
+    required this.type,
+    required this.name,
+    required this.sizeBytes,
+    required this.bytes,
+  });
+
+  String get sizeLabel => formatFileSize(sizeBytes);
+
+  String get mimeType {
+    final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'pdf':
+        return 'application/pdf';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+    return 'application/octet-stream';
+  }
+}
+
 class Comment {
   final String id;
   final AppUser author;
@@ -90,7 +133,7 @@ class Post {
   final String body;
   final DateTime createdAt;
   final bool hasImage;
-  final Set<String> likedBy; // user ids
+  final PostAttachment? attachment;
   final List<Comment> comments;
 
   Post({
@@ -102,12 +145,9 @@ class Post {
     required this.body,
     required this.createdAt,
     this.hasImage = false,
-    Set<String>? likedBy,
+    this.attachment,
     List<Comment>? comments,
-  })  : likedBy = likedBy ?? <String>{},
-        comments = comments ?? <Comment>[];
-
-  int get likeCount => likedBy.length;
+  }) : comments = comments ?? <Comment>[];
 }
 
 const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -146,8 +186,8 @@ abstract class CommunityRepository extends ChangeNotifier {
     required PostCategory category,
     required String title,
     required String body,
+    PostAttachment? attachment,
   });
-  Future<void> toggleLike(Post post);
   Future<void> addComment(Post post, String text);
 }
 
@@ -220,7 +260,6 @@ class InMemoryCommunityRepository extends CommunityRepository {
           'Last seen near Protea Glen Mall on Friday evening wearing blue school uniform. If seen please call 082 555 0123.',
       createdAt: _at(0, 9, 15),
       hasImage: true,
-      likedBy: {'a', 'b', 'c', 'd'},
       comments: [
         Comment(
             id: 'c1',
@@ -238,7 +277,6 @@ class InMemoryCommunityRepository extends CommunityRepository {
       body:
           'Patrols run nightly 20:00–02:00. Volunteers needed for Wednesday and Friday shifts. Reply here to sign up.',
       createdAt: _at(1, 18, 40),
-      likedBy: {'a', 'b'},
     ),
     Post(
       id: 'p3',
@@ -250,7 +288,6 @@ class InMemoryCommunityRepository extends CommunityRepository {
           'Missing from Florida Park since Sunday morning. Microchipped and wearing red collar. Reward offered.',
       createdAt: _at(3, 14, 20),
       hasImage: true,
-      likedBy: {'a'},
     ),
     Post(
       id: 'p4',
@@ -261,7 +298,6 @@ class InMemoryCommunityRepository extends CommunityRepository {
       body:
           'We have seen an increase in smash-and-grab incidents around Sandton CBD. Do not leave bags or phones visible in parked cars.',
       createdAt: _at(4, 8, 0),
-      likedBy: {'a', 'b', 'c'},
     ),
     Post(
       id: 'p5',
@@ -272,7 +308,6 @@ class InMemoryCommunityRepository extends CommunityRepository {
       body:
           'White bakkie with no number plates driving slowly past houses around 19:00. Please lock gates and report to SAPS if you see it.',
       createdAt: _at(5, 19, 30),
-      likedBy: {'a'},
     ),
     Post(
       id: 'p6',
@@ -303,6 +338,7 @@ class InMemoryCommunityRepository extends CommunityRepository {
     required PostCategory category,
     required String title,
     required String body,
+    PostAttachment? attachment,
   }) async {
     _posts.add(Post(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -312,15 +348,8 @@ class InMemoryCommunityRepository extends CommunityRepository {
       title: title,
       body: body,
       createdAt: DateTime.now(),
+      attachment: attachment,
     ));
-    notifyListeners();
-  }
-
-  @override
-  Future<void> toggleLike(Post post) async {
-    if (!post.likedBy.remove(currentUser.id)) {
-      post.likedBy.add(currentUser.id);
-    }
     notifyListeners();
   }
 

@@ -1,5 +1,7 @@
+
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../../theme/app_colors.dart';
+import 'bottom_nav_scaffold.dart';
 import 'community_data.dart';
 import 'create_post_screen.dart';
 import 'post_card.dart';
@@ -9,17 +11,21 @@ class BulletinBoardScreen extends StatefulWidget {
   const BulletinBoardScreen({super.key});
 
   @override
-  State<BulletinBoardScreen> createState() => _BulletinBoardScreenState();
+  State<BulletinBoardScreen> createState() =>
+      _BulletinBoardScreenState();
 }
 
-class _BulletinBoardScreenState extends State<BulletinBoardScreen> {
-  Suburb? _area; // null = all areas
-  PostCategory? _category; // null = All
+class _BulletinBoardScreenState
+    extends State<BulletinBoardScreen> {
+  Suburb? _area;
+  PostCategory? _category;
 
   void _openCreatePost() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => CreatePostScreen(initialArea: _area)),
+      MaterialPageRoute(
+        builder: (_) => CreatePostScreen(initialArea: _area),
+      ),
     );
   }
 
@@ -29,7 +35,9 @@ class _BulletinBoardScreenState extends State<BulletinBoardScreen> {
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(20),
+        ),
       ),
       builder: (sheetContext) => _AreaPickerSheet(
         selected: _area,
@@ -41,43 +49,59 @@ class _BulletinBoardScreenState extends State<BulletinBoardScreen> {
     );
   }
 
+  void _openPostDetail(dynamic post) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PostDetailScreen(post: post),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      // TODO: the team's navigation bar goes here (bottomNavigationBar).
-      body: Column(
+    return BottomNavScaffold(
+      currentIndex: 3,
+      title: 'Alerts',
+      child: Column(
         children: [
           _Header(
             area: _area,
             category: _category,
             onPost: _openCreatePost,
             onAreaTap: _openAreaPicker,
-            onCategory: (c) => setState(() => _category = c),
+            onCategory: (category) {
+              setState(() => _category = category);
+            },
           ),
           Expanded(
             child: AnimatedBuilder(
               animation: communityRepo,
               builder: (context, _) {
-                final posts =
-                    communityRepo.posts(area: _area, category: _category);
+                final posts = communityRepo.posts(
+                  area: _area,
+                  category: _category,
+                );
+
                 if (posts.isEmpty) {
-                  return _EmptyState(onPost: _openCreatePost);
+                  return _EmptyState(
+                    onPost: _openCreatePost,
+                  );
                 }
+
                 return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(
+                    16, 16, 16, 24,
+                  ),
                   itemCount: posts.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 14),
-                  itemBuilder: (context, i) {
-                    final post = posts[i];
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: 14),
+                  itemBuilder: (context, index) {
+                    final post = posts[index];
+
                     return PostCard(
                       post: post,
-                      onLike: () => communityRepo.toggleLike(post),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => PostDetailScreen(post: post)),
-                      ),
+                      onTap: () => _openPostDetail(post),
                     );
                   },
                 );
@@ -108,18 +132,24 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final categories = PostCategory.values;
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [AppColors.heroBlue, AppColors.darkBlue],
+          colors: [
+            AppColors.heroBlue,
+            AppColors.darkBlue,
+          ],
         ),
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          padding: const EdgeInsets.fromLTRB(
+            20, 12, 20, 16,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -130,29 +160,37 @@ class _Header extends StatelessWidget {
                       'Bulletin Board',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 24,
+                        fontSize: 22,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
                   Material(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    color: Colors.white.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(20),
                       onTap: onPost,
                       child: const Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         child: Row(
                           children: [
-                            Icon(Icons.edit_outlined,
-                                color: Colors.white, size: 16),
+                            Icon(
+                              Icons.edit_outlined,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                             SizedBox(width: 6),
-                            Text('Post',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600)),
+                            Text(
+                              'Post',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -165,19 +203,29 @@ class _Header extends StatelessWidget {
                 onTap: onAreaTap,
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 4,
+                  ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.place_outlined,
-                          color: Colors.white70, size: 16),
+                      const Icon(
+                        Icons.place_outlined,
+                        color: Colors.white70,
+                        size: 16,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         area?.label ?? 'All areas',
                         style: const TextStyle(
-                            color: Colors.white70, fontSize: 14),
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
                       ),
-                      const Icon(Icons.arrow_drop_down, color: Colors.white70),
+                      const Icon(
+                        Icons.arrow_drop_down,
+                        color: Colors.white70,
+                      ),
                     ],
                   ),
                 ),
@@ -188,20 +236,23 @@ class _Header extends StatelessWidget {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: categories.length + 1,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (context, i) {
-                    if (i == 0) {
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
                       return _FilterChip(
                         label: 'All',
                         selected: category == null,
                         onTap: () => onCategory(null),
                       );
                     }
-                    final c = categories[i - 1];
+
+                    final item = categories[index - 1];
+
                     return _FilterChip(
-                      label: c.chipLabel,
-                      selected: category == c,
-                      onTap: () => onCategory(c),
+                      label: item.chipLabel,
+                      selected: category == item,
+                      onTap: () => onCategory(item),
                     );
                   },
                 ),
@@ -218,23 +269,34 @@ class _FilterChip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const _FilterChip(
-      {required this.label, required this.selected, required this.onTap});
+
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? Colors.white : Colors.white.withValues(alpha: 0.14),
+      color: selected
+          ? Colors.white
+          : Colors.white.withOpacity(0.14),
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 8,
+          ),
           child: Text(
             label,
             style: TextStyle(
-              color: selected ? AppColors.darkBlue : Colors.white,
+              color: selected
+                  ? AppColors.darkBlue
+                  : Colors.white,
               fontWeight: FontWeight.w600,
               fontSize: 14,
             ),
@@ -247,6 +309,7 @@ class _FilterChip extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   final VoidCallback onPost;
+
   const _EmptyState({required this.onPost});
 
   @override
@@ -257,21 +320,33 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.forum_outlined,
-                size: 48, color: AppColors.textLight),
+            const Icon(
+              Icons.forum_outlined,
+              size: 48,
+              color: AppColors.textLight,
+            ),
             const SizedBox(height: 12),
-            const Text('No posts here yet',
-                style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700)),
+            const Text(
+              'No posts here yet',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 4),
-            const Text('Be the first to post in this area.',
-                style: TextStyle(color: AppColors.textSecondary)),
+            const Text(
+              'Be the first to post in this area.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+              ),
+            ),
             const SizedBox(height: 16),
             FilledButton(
               style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primaryBlue),
+                backgroundColor: AppColors.primaryBlue,
+              ),
               onPressed: onPost,
               child: const Text('Create post'),
             ),
@@ -285,25 +360,37 @@ class _EmptyState extends StatelessWidget {
 class _AreaPickerSheet extends StatelessWidget {
   final Suburb? selected;
   final ValueChanged<Suburb?> onSelected;
-  const _AreaPickerSheet({required this.selected, required this.onSelected});
+
+  const _AreaPickerSheet({
+    required this.selected,
+    required this.onSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
-    const check = Icon(Icons.check, color: AppColors.primaryBlue);
+    const check = Icon(
+      Icons.check,
+      color: AppColors.primaryBlue,
+    );
+
     return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7),
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
         child: ListView(
           shrinkWrap: true,
           children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
-              child: Text('Choose your area',
-                  style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700)),
+              child: Text(
+                'Choose your area',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
             ListTile(
               leading: const Icon(Icons.public),
@@ -313,16 +400,22 @@ class _AreaPickerSheet extends StatelessWidget {
             ),
             for (final city in communityRepo.cities)
               ExpansionTile(
-                initiallyExpanded: selected?.city == city.name,
+                initiallyExpanded:
+                    selected?.city == city.name,
                 leading: const Icon(Icons.location_city),
                 title: Text(city.name),
                 children: [
-                  for (final s in city.suburbs)
+                  for (final suburb in city.suburbs)
                     ListTile(
-                      contentPadding: const EdgeInsets.only(left: 72, right: 16),
-                      title: Text(s.name),
-                      trailing: selected?.id == s.id ? check : null,
-                      onTap: () => onSelected(s),
+                      contentPadding: const EdgeInsets.only(
+                        left: 72,
+                        right: 16,
+                      ),
+                      title: Text(suburb.name),
+                      trailing: selected?.id == suburb.id
+                          ? check
+                          : null,
+                      onTap: () => onSelected(suburb),
                     ),
                 ],
               ),

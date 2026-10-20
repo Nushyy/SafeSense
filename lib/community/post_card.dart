@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import 'community_data.dart';
+import 'share_post_screen.dart';
 
 class UserAvatar extends StatelessWidget {
   final AppUser user;
@@ -51,7 +52,6 @@ class CategoryTag extends StatelessWidget {
 class PostCard extends StatelessWidget {
   final Post post;
   final VoidCallback? onTap;
-  final VoidCallback? onLike;
 
   /// false in the feed (body is cut after 3 lines), true on the detail screen.
   final bool expanded;
@@ -60,13 +60,11 @@ class PostCard extends StatelessWidget {
     super.key,
     required this.post,
     this.onTap,
-    this.onLike,
     this.expanded = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final liked = post.likedBy.contains(communityRepo.currentUser.id);
     final area = communityRepo.suburbById(post.areaId);
 
     return Container(
@@ -153,7 +151,12 @@ class PostCard extends StatelessWidget {
                     height: 1.4,
                   ),
                 ),
-                if (post.hasImage) ...[
+                if (post.attachment != null) ...[
+                  const SizedBox(height: 12),
+                  AttachmentView(
+                      attachment: post.attachment!,
+                      pictureHeight: expanded ? 260 : 180),
+                ] else if (post.hasImage) ...[
                   const SizedBox(height: 12),
                   Container(
                     height: 140,
@@ -169,30 +172,27 @@ class PostCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 const Divider(height: 1, color: AppColors.divider),
                 const SizedBox(height: 8),
-                // Footer: like, comments, area
+                // Footer: share, comments, area
                 Row(
                   children: [
-                    InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: onLike,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 4),
-                        child: Row(
-                          children: [
-                            Icon(
-                              liked ? Icons.favorite : Icons.favorite_border,
-                              size: 20,
-                              color: liked
-                                  ? AppColors.danger
-                                  : AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 6),
-                            Text('${post.likeCount}',
-                                style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 13)),
-                          ],
+                    Builder(
+                      builder: (buttonContext) => InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => sharePost(buttonContext, post),
+                        child: const Padding(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                          child: Row(
+                            children: [
+                              Icon(Icons.share_outlined,
+                                  size: 20, color: AppColors.textSecondary),
+                              SizedBox(width: 6),
+                              Text('Share',
+                                  style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 13)),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -216,6 +216,130 @@ class PostCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Shows a post's picture or document.
+/// Pass [onRemove] on the create screen to show a remove (X) button.
+class AttachmentView extends StatelessWidget {
+  final PostAttachment attachment;
+  final double pictureHeight;
+  final VoidCallback? onRemove;
+  const AttachmentView({
+    super.key,
+    required this.attachment,
+    this.pictureHeight = 180,
+    this.onRemove,
+  });
+
+  void _zoom(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              child: Center(child: Image.memory(attachment.bytes)),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.pop(dialogContext),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final removeButton = onRemove == null
+        ? null
+        : IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            color: AppColors.textSecondary,
+            tooltip: 'Remove',
+            onPressed: onRemove,
+          );
+
+    if (attachment.type == AttachmentType.picture) {
+      return GestureDetector(
+        onTap: () => _zoom(context),
+        child: Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(
+                attachment.bytes,
+                width: double.infinity,
+                height: pictureHeight,
+                fit: BoxFit.cover,
+              ),
+            ),
+            if (onRemove != null)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: GestureDetector(
+                  onTap: onRemove,
+                  child: const CircleAvatar(
+                    radius: 14,
+                    backgroundColor: Colors.black54,
+                    child: Icon(Icons.close, size: 16, color: Colors.white),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    final isPdf = attachment.name.toLowerCase().endsWith('.pdf');
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: AppColors.softSurface,
+        border: Border.all(color: AppColors.divider),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isPdf ? Icons.picture_as_pdf_outlined : Icons.description_outlined,
+            color: isPdf ? AppColors.danger : AppColors.primaryBlue,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  attachment.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13),
+                ),
+                Text(
+                  attachment.sizeLabel,
+                  style: const TextStyle(
+                      color: AppColors.textSecondary, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          if (removeButton != null) removeButton else const SizedBox(width: 8),
+        ],
       ),
     );
   }

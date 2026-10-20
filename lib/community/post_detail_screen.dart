@@ -49,7 +49,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     PostCard(
                       post: post,
                       expanded: true,
-                      onLike: () => communityRepo.toggleLike(post),
                     ),
                     const SizedBox(height: 20),
                     Text(
