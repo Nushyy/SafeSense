@@ -1,10 +1,11 @@
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../theme/app_colors.dart';
-import '../../theme/app_theme.dart';
 import '../../services/profile_repository.dart';
+import '../../components/BottomNav/bottom_nav_scaffold.dart';
 
 import 'edit_profile_screen.dart';
 import 'personal_details_screen.dart';
@@ -24,19 +25,70 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _loading = true;
   bool _loadFailed = false;
+  bool _reportsLoading = true;
 
   String _fullName = 'SafeSense User';
   String _username = '@user';
   String _town = 'Location not set';
 
-  // Temporary until connected to the reporting and alerts tables.
-  final int _reportsCount = 0;
+  int _reportsCount = 0;
+
+  // Connect this to the real alerts data once the alerts table/schema is confirmed.
   final int _alertsCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    _loadReportsCount();
+  }
+
+  Future<void> _loadReportsCount() async {
+    if (!mounted) return;
+
+    setState(() {
+      _reportsLoading = true;
+    });
+
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+
+      if (user == null) {
+        if (!mounted) return;
+        setState(() {
+          _reportsCount = 0;
+          _reportsLoading = false;
+        });
+        return;
+      }
+
+      // SafeSense stores submitted reports in `crime_reports`.
+      final reports = await supabase
+          .from('crime_reports')
+          .select('id')
+          .eq('user_id', user.id);
+
+      if (!mounted) return;
+      setState(() {
+        _reportsCount = reports.length;
+      });
+    } catch (error) {
+      debugPrint('Could not load report count: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _reportsLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _refreshProfile() async {
+    await Future.wait([
+      _loadProfile(),
+      _loadReportsCount(),
+    ]);
   }
 
   Future<void> _loadProfile() async {
@@ -138,14 +190,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You have been signed out.'),
-        ),
-      );
-
-      // Connect this action to your login screen when
-      // your authentication navigation is implemented.
+      // Clear the authenticated screen stack and return to login.
+      context.go('/login');
     } catch (error) {
       if (!mounted) return;
 
@@ -167,29 +213,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (mounted) {
-      await _loadProfile();
+      await _refreshProfile();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'Profile',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ),
-      body: SafeArea(
+        return BottomNavScaffold(
+          currentIndex: 4,
+          title: 'Profile',
         child: RefreshIndicator(
-          onRefresh: _loadProfile,
-          child: ListView(
+          onRefresh: _refreshProfile,
+          child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
+            child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
             children: [
               _buildHeader(context),
               if (_loading) ...[
@@ -278,8 +320,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 _divider(context),
-                _darkModeItem(context, isDark),
-                _divider(context),
                 _menuItem(
                   context,
                   icon: Icons.info_outline,
@@ -342,9 +382,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
         ),
+          ),
       ),
     );
   }
+  
 
   Widget _buildHeader(BuildContext context) {
     return Container(
@@ -468,7 +510,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             context,
             icon: Icons.report_outlined,
             iconColor: const Color(0xFF1976D2),
-            value: _reportsCount.toString(),
+            value: _reportsLoading ? '…' : _reportsCount.toString(),
             label: 'Reports',
           ),
         ),
@@ -655,70 +697,5 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _darkModeItem(BuildContext context, bool isDark) {
-    final colors = Theme.of(context).colorScheme;
 
-    const lightModeColor = Color(0xFFF9A825);
-    const darkModeColor = Color(0xFF5C6BC0);
-
-    final iconColor = isDark ? darkModeColor : lightModeColor;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 12,
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: Icon(
-              isDark
-                  ? Icons.dark_mode_outlined
-                  : Icons.light_mode_outlined,
-              color: iconColor,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Dark Mode',
-                  style: TextStyle(
-                    color: colors.onSurface,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  isDark
-                      ? 'Dark appearance is enabled'
-                      : 'Use a darker appearance',
-                  style: TextStyle(
-                    color: colors.onSurfaceVariant,
-                    fontSize: 12.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: isDark,
-            onChanged: (enabled) {
-              AppThemeController.setDarkMode(enabled);
-            },
-          ),
-        ],
-      ),
-    );
-  }
 }
