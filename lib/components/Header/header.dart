@@ -2,28 +2,36 @@ import 'package:flutter/material.dart';
 import '../../theme/colors.dart';
 import '../../theme/spacing.dart';
 
-/// The top bar shown on every main screen:
-/// app name on the left, bell and burger menu on the right.
+
+
+/// [hasUnread] shows a red dot on the bell. It defaults to false so the
+
 class Header extends StatelessWidget implements PreferredSizeWidget {
-  const Header({super.key, this.title = 'SafeSense'});
+  const Header({super.key, this.title = 'SafeSense', this.hasUnread = false});
 
   final String title;
+  final bool hasUnread;
 
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      automaticallyImplyLeading: false,
+      automaticallyImplyLeading: false, // avoid a second, duplicate menu icon
       title: Row(
         children: [
-          const Icon(Icons.shield, color: AppColors.teal, size: 22),
+          const Icon(Icons.shield, color: AppColors.tealText, size: 22),
           const SizedBox(width: AppSpacing.sm),
           Text(title, style: Theme.of(context).textTheme.titleLarge),
         ],
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.notifications_outlined),
           tooltip: 'Notifications',
+          icon: Badge(
+            isLabelVisible: hasUnread,
+            smallSize: 9,
+            backgroundColor: AppColors.danger,
+            child: const Icon(Icons.notifications_outlined, size: 24),
+          ),
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('No new notifications')),
@@ -32,8 +40,8 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
         ),
         Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
             tooltip: 'Menu',
+            icon: const Icon(Icons.menu, size: 26),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),

@@ -5,10 +5,7 @@ import '../../../services/sos/sos_service.dart';
 import '../../../theme/colors.dart';
 import '../../../theme/spacing.dart';
 
-/// The SOS button. Hold for 0.6 seconds and the alert is sent
-/// immediately, then the "SOS sent" screen opens with Call 112 and a
-/// cancel option. A progress ring fills while holding, so the user can
-/// see it working, and releasing early cancels the hold.
+
 class SosButton extends StatefulWidget {
   const SosButton({super.key});
 
@@ -17,7 +14,7 @@ class SosButton extends StatefulWidget {
 }
 
 class _SosButtonState extends State<SosButton> with TickerProviderStateMixin {
-  static const double _size = 170;
+  static const double _size = 190;
   static const Duration _holdDuration = Duration(milliseconds: 600);
 
   late final AnimationController _pulse;
@@ -66,8 +63,8 @@ class _SosButtonState extends State<SosButton> with TickerProviderStateMixin {
     return Column(
       children: [
         SizedBox(
-          width: _size + 70,
-          height: _size + 70,
+          width: _size + 80,
+          height: _size + 80,
           child: AnimatedBuilder(
             animation: Listenable.merge([_pulse, _hold]),
             builder: (context, _) {
@@ -109,7 +106,7 @@ class _SosButtonState extends State<SosButton> with TickerProviderStateMixin {
                               height: _size - 16,
                               child: CircularProgressIndicator(
                                 value: _hold.value,
-                                strokeWidth: 7,
+                                strokeWidth: 8,
                                 color: Colors.white,
                                 backgroundColor: Colors.white24,
                               ),
@@ -121,7 +118,7 @@ class _SosButtonState extends State<SosButton> with TickerProviderStateMixin {
                                   'SOS',
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 40,
+                                    fontSize: 44,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 1,
                                   ),
@@ -147,13 +144,12 @@ class _SosButtonState extends State<SosButton> with TickerProviderStateMixin {
             },
           ),
         ),
-        const SizedBox(height: AppSpacing.xs),
         Text(
-          'Hold for half a second to alert nearest community responders '
-          'and police',
+          'Press and hold for half a second',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall,
         ),
+        const SizedBox(height: AppSpacing.xs),
       ],
     );
   }
