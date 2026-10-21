@@ -1,50 +1,119 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../theme/colors.dart';
 import '../../../theme/spacing.dart';
 
-class _AlertPreview {
-  const _AlertPreview(this.icon, this.label, this.distance, this.time, this.color);
-  final IconData icon;
-  final String label;
-  final String distance;
-  final String time;
-  final Color color;
-}
-
-// TODO(alerts-owner): replace with a real query for the latest reports.
-const _placeholderAlerts = [
-  _AlertPreview(Icons.warning_amber, 'Break-in reported', '0.4 km', '12 min ago', AppColors.danger),
-  _AlertPreview(Icons.directions_car_outlined, 'Suspicious vehicle', '1.1 km', '40 min ago', AppColors.warning),
-];
-
-/// Shows the most recent nearby alerts, with a link to the full Alerts tab.
+/// Displays the Recent Alerts section on the Home Dashboard.
+///
+/// A community-wide incident feed has not yet been connected.
+/// No fabricated incidents are displayed as real alerts.
 class RecentAlertsPreview extends StatelessWidget {
   const RecentAlertsPreview({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Recent alerts', style: Theme.of(context).textTheme.titleLarge),
-            TextButton(onPressed: () => context.go('/alerts'), child: const Text('See all')),
-          ],
-        ),
-        ..._placeholderAlerts.map(
-          (alert) => Card(
-            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: ListTile(
-              leading: Icon(alert.icon, color: alert.color),
-              title: Text(alert.label, style: Theme.of(context).textTheme.bodyMedium),
-              subtitle: Text('${alert.distance} · ${alert.time}', style: Theme.of(context).textTheme.bodySmall),
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.navy, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.notifications_active_outlined,
+                color: AppColors.navy,
+                size: 22,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Recent Alerts',
+                  style: textTheme.titleLarge?.copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => context.go('/alerts'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.blue,
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                child: const Text('See all'),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.blue.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.blue.withValues(alpha: 0.15)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.blue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.notifications_none_outlined,
+                    color: AppColors.blue,
+                    size: 24,
+                  ),
+                ),
+
+                const SizedBox(width: AppSpacing.md),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Community alerts are not available yet',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: AppColors.navy,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Nearby incident alerts will appear here once '
+                        'the community reporting feed is connected.',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

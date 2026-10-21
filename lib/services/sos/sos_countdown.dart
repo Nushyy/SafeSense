@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../../theme/colors.dart';
 import '../../theme/spacing.dart';
 
@@ -109,7 +111,7 @@ class _SosCountdownDialogState extends State<_SosCountdownDialog> {
               ),
               const SizedBox(height: AppSpacing.md),
               const Text(
-                'Alerting community responders and police',
+                'SOS demonstration only. No emergency alert will be sent.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white, fontSize: 14),
               ),
