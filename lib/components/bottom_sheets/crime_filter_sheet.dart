@@ -10,7 +10,7 @@ class CrimeFilterSheet extends StatelessWidget {
 
   static const List<String> crimes = [
     'All Crime',
-    'Antisocial Behaviour',
+    'Antisocial Behavior',
     'Bicycle Theft',
     'Burglary',
     'Criminal Damage & Arson',
@@ -32,7 +32,7 @@ class CrimeFilterSheet extends StatelessWidget {
       case 'All Crime':
         return Icons.apps_rounded;
 
-      case 'Antisocial Behaviour':
+      case 'Antisocial Behavior':
         return Icons.groups_rounded;
 
       case 'Bicycle Theft':
@@ -85,7 +85,7 @@ class CrimeFilterSheet extends StatelessWidget {
       case 'All Crime':
         return const Color(0xFF4F46E5);
 
-      case 'Antisocial Behaviour':
+      case 'Antisocial Behavior':
         return const Color(0xFF7C3AED);
 
       case 'Bicycle Theft':
