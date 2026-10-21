@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -31,15 +32,16 @@ class RecentAlertsPreview extends StatelessWidget {
               const Icon(
                 Icons.notifications_active_outlined,
                 color: AppColors.navy,
-                size: 22,
+                size: 20,
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
                   'Recent Alerts',
-                  style: textTheme.titleLarge?.copyWith(
+                  style: textTheme.titleMedium?.copyWith(
                     color: AppColors.navy,
                     fontWeight: FontWeight.w700,
+                    fontSize: 18,
                   ),
                 ),
               ),
@@ -65,7 +67,9 @@ class RecentAlertsPreview extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.blue.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.blue.withValues(alpha: 0.15)),
+              border: Border.all(
+                color: AppColors.blue.withValues(alpha: 0.15),
+              ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,

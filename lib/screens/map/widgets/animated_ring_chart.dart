@@ -2,7 +2,12 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 class AnimatedRingChart extends StatefulWidget {
-  const AnimatedRingChart({super.key});
+  final Map<String, int> statuses;
+
+  const AnimatedRingChart({
+    super.key,
+    required this.statuses,
+  });
 
   @override
   State<AnimatedRingChart> createState() => _AnimatedRingChartState();
@@ -15,122 +20,107 @@ class _AnimatedRingChartState extends State<AnimatedRingChart> {
   void initState() {
     super.initState();
 
-    // Starts drawing the chart after the widget loads
-    Future.delayed(const Duration(milliseconds: 200), () {
-      if (mounted) {
-        setState(() {
-          animate = true;
-        });
-      }
-    });
+    Future.delayed(
+      const Duration(milliseconds: 200),
+      () {
+        if (mounted) {
+          setState(() {
+            animate = true;
+          });
+        }
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 220,
+    final total = widget.statuses.values.fold(
+      0,
+      (sum, item) => sum + item,
+    );
 
+    final entries = widget.statuses.entries.toList();
+
+    return SizedBox(
+      height: 240,
       child: Row(
         children: [
-
-          /// ---------------- Doughnut Chart ----------------
           Expanded(
-            flex: 5,
+            flex: 7,
             child: PieChart(
               PieChartData(
                 sectionsSpace: 2,
                 centerSpaceRadius: 48,
                 startDegreeOffset: -90,
-
-                pieTouchData: PieTouchData(
-                  enabled: false,
-                ),
-
                 sections: animate
-                    ? [
+                    ? entries.map((status) {
+                        final percentage =
+                            total == 0 ? 0 : status.value / total * 100;
 
-                        PieChartSectionData(
-                          value: 56,
-                          color: Colors.blue,
+                        return PieChartSectionData(
+                          value: status.value.toDouble(),
+                          title: "${percentage.toStringAsFixed(0)}%",
                           radius: 45,
-                          title: "56%",
+                          color: statusColor(status.key),
                           titleStyle: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            fontSize: 15,
+                            fontSize: 14,
                           ),
-                        ),
-
-                        PieChartSectionData(
-                          value: 32,
-                          color: Colors.green,
-                          radius: 45,
-                          title: "32%",
-                          titleStyle: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-
-                        PieChartSectionData(
-                          value: 12,
-                          color: Colors.orange,
-                          radius: 45,
-                          title: "12%",
-                          titleStyle: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ]
+                        );
+                      }).toList()
                     : [],
               ),
-
               duration: const Duration(milliseconds: 900),
-
               curve: Curves.easeOutCubic,
             ),
           ),
 
           const SizedBox(width: 18),
 
-          /// ---------------- Legend ----------------
           Expanded(
             flex: 6,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-
-                StatusItem(
-                  color: Colors.blue,
-                  title: "No Further Action",
-                  cases: "312 cases",
+            child: Center(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (int i = 0; i < entries.length; i++) ...[
+                      StatusItem(
+                        color: statusColor(entries[i].key),
+                        title: entries[i].key,
+                        cases: "${entries[i].value} cases",
+                      ),
+                      if (i != entries.length - 1) const SizedBox(height: 12),
+                    ],
+                  ],
                 ),
-
-                SizedBox(height: 18),
-
-                StatusItem(
-                  color: Colors.green,
-                  title: "Still In Progress",
-                  cases: "178 cases",
-                ),
-
-                SizedBox(height: 18),
-
-                StatusItem(
-                  color: Colors.orange,
-                  title: "Offender Dealt With",
-                  cases: "67 cases",
-                ),
-              ],
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Color statusColor(String status) {
+    switch (status) {
+      case "Still In Progress":
+        return Colors.green;
+
+      case "Under Investigation":
+        return Colors.purple;
+
+      case "Offender Dealt With":
+        return Colors.orange;
+
+      case "No Further Action":
+        return Colors.blue;
+
+      default:
+        return Colors.grey;
+    }
   }
 }
 
@@ -150,7 +140,6 @@ class StatusItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-
         Container(
           width: 16,
           height: 16,
@@ -166,20 +155,16 @@ class StatusItem extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               Text(
                 title,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 15,
                 ),
               ),
-
               Text(
                 cases,
                 style: TextStyle(
                   color: Colors.grey.shade600,
-                  fontSize: 14,
                 ),
               ),
             ],

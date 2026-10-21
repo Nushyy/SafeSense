@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 
 import '../../theme/colors.dart';
@@ -16,7 +17,11 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
+
+      // Keep the SafeSense logo and app name on the left.
+      centerTitle: false,
       titleSpacing: AppSpacing.md,
+
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -47,6 +52,7 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
           ),
         ],
       ),
+
       actions: [
         IconButton(
           icon: const Icon(Icons.notifications_outlined),

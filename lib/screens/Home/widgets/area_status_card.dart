@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
@@ -95,36 +96,41 @@ class _AreaStatusCardState extends State<AreaStatusCard> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.navy, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
               const Icon(
                 Icons.location_on_outlined,
                 color: AppColors.navy,
-                size: 22,
+                size: 20,
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
                   'Your Area',
-                  style: textTheme.titleLarge?.copyWith(
+                  style: textTheme.titleMedium?.copyWith(
                     color: AppColors.navy,
                     fontWeight: FontWeight.w700,
+                    fontSize: 18,
                   ),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm),
 
           if (_isLoading)
             const Row(
@@ -144,7 +150,7 @@ class _AreaStatusCardState extends State<AreaStatusCard> {
           else if (_position != null) ...[
             Text(
               _placeName ?? 'Location identified',
-              style: textTheme.titleMedium?.copyWith(
+              style: textTheme.titleSmall?.copyWith(
                 color: AppColors.navy,
                 fontWeight: FontWeight.w600,
               ),
@@ -160,7 +166,7 @@ class _AreaStatusCardState extends State<AreaStatusCard> {
               ),
             ],
 
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.xs),
 
             Text(
               'Area safety information is not available yet.',
@@ -179,7 +185,7 @@ class _AreaStatusCardState extends State<AreaStatusCard> {
             ),
           ],
 
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm),
 
           if (!_isLoading)
             SizedBox(
@@ -196,7 +202,7 @@ class _AreaStatusCardState extends State<AreaStatusCard> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
                 icon: Icon(
                   _position == null ? Icons.my_location : Icons.refresh,
@@ -207,7 +213,7 @@ class _AreaStatusCardState extends State<AreaStatusCard> {
               ),
             ),
 
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.xs),
 
           SizedBox(
             width: double.infinity,
@@ -215,7 +221,9 @@ class _AreaStatusCardState extends State<AreaStatusCard> {
               onPressed: () => context.go('/map'),
               icon: const Icon(Icons.map_outlined),
               label: const Text('View map'),
-              style: TextButton.styleFrom(foregroundColor: AppColors.navy),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.navy,
+              ),
             ),
           ),
         ],
