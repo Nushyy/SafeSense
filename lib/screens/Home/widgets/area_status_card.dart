@@ -1,110 +1,221 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../services/location/location_service.dart';
+import '../../../services/location/search_service.dart';
 import '../../../theme/colors.dart';
 import '../../../theme/spacing.dart';
 
-/// Risk level shown as a coloured badge. Calculated from recent report
-/// counts once the reporting teammate's data is wired in.
-enum RiskLevel { low, medium, high }
+/// Displays the user's current location on the Home Dashboard.
+///
+/// Location is requested only when the user taps the button.
+/// Crime risk and alert counts are not shown until verified data
+/// becomes available.
+class AreaStatusCard extends StatefulWidget {
+  const AreaStatusCard({super.key});
 
-extension on RiskLevel {
-  Color get color {
-    switch (this) {
-      case RiskLevel.low:
-        return AppColors.success;
-      case RiskLevel.medium:
-        return AppColors.warning;
-      case RiskLevel.high:
-        return AppColors.danger;
-    }
-  }
-
-  String get label {
-    switch (this) {
-      case RiskLevel.low:
-        return 'Low risk';
-      case RiskLevel.medium:
-        return 'Medium risk';
-      case RiskLevel.high:
-        return 'High risk';
-    }
-  }
+  @override
+  State<AreaStatusCard> createState() => _AreaStatusCardState();
 }
 
-/// A quick summary of the area the user is currently in, with a link to
-/// the full Map tab -- replaces the old map preview, which duplicated
-/// the Map tab without adding anything a tap on that tab didn't show.
-///
-/// TODO(map-owner or reporting-owner): replace the hardcoded values below
-/// with a real query: current area name from reverse-geocoding the
-/// user's location, alert count from crime_reports in the last 24h,
-/// and a risk level derived from that count / severity mix.
-class AreaStatusCard extends StatelessWidget {
-  const AreaStatusCard({
-    super.key,
-    this.areaName = 'Riverside',
-    this.alertsLast24h = 3,
-    this.risk = RiskLevel.medium,
-  });
+class _AreaStatusCardState extends State<AreaStatusCard> {
+  final LocationService _locationService = LocationService();
+  final SearchService _searchService = SearchService();
 
-  final String areaName;
-  final int alertsLast24h;
-  final RiskLevel risk;
+  Position? _position;
+  String? _placeName;
+  String? _message;
+  bool _isLoading = false;
+
+  Future<void> _getLocation() async {
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+      _message = null;
+      _placeName = null;
+      _position = null;
+    });
+
+    try {
+      final position = await _locationService.getCurrentLocation();
+
+      if (!mounted) return;
+
+      if (position == null) {
+        setState(() {
+          _message =
+              'Location is unavailable. Check your device location '
+              'settings and allow SafeSense to access your location.';
+        });
+        return;
+      }
+
+      setState(() {
+        _position = position;
+      });
+
+      final placeName = await _searchService.reverseGeocode(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _placeName = placeName;
+
+        if (placeName == null || placeName.trim().isEmpty) {
+          _message =
+              'Your GPS location was found, but the place name '
+              'could not be identified.';
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _message =
+            'Unable to retrieve your location. Please check your '
+            'permissions and internet connection, then try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.navy, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.location_on_outlined, color: AppColors.navy, size: 20),
-              const SizedBox(width: AppSpacing.xs),
-              Text('You are in', style: Theme.of(context).textTheme.bodySmall),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(areaName, style: Theme.of(context).textTheme.titleLarge),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: risk.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
+              const Icon(
+                Icons.location_on_outlined,
+                color: AppColors.navy,
+                size: 22,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
                 child: Text(
-                  risk.label,
-                  style: TextStyle(color: risk.color, fontSize: 12, fontWeight: FontWeight.w600),
+                  'Your Area',
+                  style: textTheme.titleLarge?.copyWith(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            '$alertsLast24h alert${alertsLast24h == 1 ? '' : 's'} reported nearby in the last 24 hours',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+
           const SizedBox(height: AppSpacing.md),
+
+          if (_isLoading)
+            const Row(
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.blue,
+                  ),
+                ),
+                SizedBox(width: AppSpacing.sm),
+                Expanded(child: Text('Identifying your location...')),
+              ],
+            )
+          else if (_position != null) ...[
+            Text(
+              _placeName ?? 'Location identified',
+              style: textTheme.titleMedium?.copyWith(
+                color: AppColors.navy,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+
+            if (_message != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                _message!,
+                style: textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+
+            const SizedBox(height: AppSpacing.sm),
+
+            Text(
+              'Area safety information is not available yet.',
+              style: textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ] else ...[
+            Text(
+              _message ??
+                  'Enable location access to identify your '
+                      'current area and explore the SafeSense map.',
+              style: textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+
+          const SizedBox(height: AppSpacing.md),
+
+          if (!_isLoading)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _getLocation,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.navy,
+                  backgroundColor: AppColors.blue.withValues(alpha: 0.05),
+                  side: BorderSide(
+                    color: AppColors.blue.withValues(alpha: 0.45),
+                    width: 1.5,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                icon: Icon(
+                  _position == null ? Icons.my_location : Icons.refresh,
+                ),
+                label: Text(
+                  _position == null ? 'Get my location' : 'Refresh location',
+                ),
+              ),
+            ),
+
+          const SizedBox(height: AppSpacing.sm),
+
           SizedBox(
             width: double.infinity,
-            child: OutlinedButton.icon(
+            child: TextButton.icon(
               onPressed: () => context.go('/map'),
-              icon: const Icon(Icons.map_outlined, size: 18),
-              label: const Text('View on map'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.navy,
-                side: const BorderSide(color: AppColors.border),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
+              icon: const Icon(Icons.map_outlined),
+              label: const Text('View map'),
+              style: TextButton.styleFrom(foregroundColor: AppColors.navy),
             ),
           ),
         ],
