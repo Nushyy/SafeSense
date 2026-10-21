@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 
 // =====================================================================
@@ -336,6 +337,143 @@ class InMemoryCommunityRepository extends CommunityRepository {
   }
 }
 
+
+/// Supabase-backed community feed. Keeps the synchronous posts() interface used
+/// by existing screens and notifies listeners after asynchronous database reads.
+class SupabaseCommunityRepository extends InMemoryCommunityRepository {
+  final SupabaseClient _client = Supabase.instance.client;
+  List<Post> _remotePosts = [];
+
+  SupabaseCommunityRepository() {
+    refresh().catchError((Object error) {
+      debugPrint('Community feed loading failed: $error');
+    });
+  }
+
+  String get _userId {
+    final id = _client.auth.currentUser?.id;
+    if (id == null) throw StateError('Sign in to use the community board.');
+    return id;
+  }
+
+  @override
+  AppUser get currentUser => AppUser(
+        id: _client.auth.currentUser?.id ?? 'signed-out',
+        name: 'You',
+        color: AppColors.heroBlue,
+      );
+
+  AppUser _author(String id) => id == _client.auth.currentUser?.id
+      ? currentUser
+      : AppUser(id: id, name: 'Community member', color: AppColors.primaryBlue);
+
+  /// Fetch the most recent posts and their comments and likes.
+  Future<void> refresh() async {
+    if (_client.auth.currentUser == null) {
+      _remotePosts = [];
+      notifyListeners();
+      return;
+    }
+
+    final rows = await _client
+        .from('community_posts')
+        .select('id, area_id, author_id, category, title, body, created_at')
+        .order('created_at', ascending: false)
+        .limit(200);
+    final comments = await _client
+        .from('community_comments')
+        .select('id, post_id, author_id, body, created_at')
+        .order('created_at', ascending: true)
+        .limit(2000);
+    final likes = await _client
+        .from('community_post_likes')
+        .select('post_id, user_id')
+        .limit(5000);
+
+    final commentsByPost = <String, List<Comment>>{};
+    for (final row in comments) {
+      final id = row['post_id'] as String;
+      commentsByPost.putIfAbsent(id, () => []).add(Comment(
+            id: row['id'] as String,
+            author: _author(row['author_id'] as String),
+            text: row['body'] as String,
+            createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
+          ));
+    }
+    final likesByPost = <String, Set<String>>{};
+    for (final row in likes) {
+      final id = row['post_id'] as String;
+      likesByPost.putIfAbsent(id, () => <String>{})
+          .add(row['user_id'] as String);
+    }
+
+    _remotePosts = [
+      for (final row in rows)
+        Post(
+          id: row['id'] as String,
+          areaId: row['area_id'] as String,
+          author: _author(row['author_id'] as String),
+          category: PostCategory.values.byName(row['category'] as String),
+          title: row['title'] as String,
+          body: row['body'] as String,
+          createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
+          likedBy: likesByPost[row['id'] as String] ?? <String>{},
+          comments: commentsByPost[row['id'] as String] ?? <Comment>[],
+        ),
+    ];
+    notifyListeners();
+  }
+
+  @override
+  List<Post> posts({Suburb? area, PostCategory? category}) => _remotePosts
+      .where((post) =>
+          (area == null || post.areaId == area.id) &&
+          (category == null || post.category == category))
+      .toList();
+
+  @override
+  Future<void> addPost({
+    required Suburb area,
+    required PostCategory category,
+    required String title,
+    required String body,
+  }) async {
+    await _client.from('community_posts').insert({
+      'author_id': _userId,
+      'area_id': area.id,
+      'category': category.name,
+      'title': title,
+      'body': body,
+    });
+    await refresh();
+  }
+
+  @override
+  Future<void> toggleLike(Post post) async {
+    final userId = _userId;
+    if (post.likedBy.contains(userId)) {
+      await _client.from('community_post_likes')
+          .delete().eq('post_id', post.id).eq('user_id', userId);
+    } else {
+      await _client.from('community_post_likes').insert({
+        'post_id': post.id,
+        'user_id': userId,
+      });
+    }
+    await refresh();
+  }
+
+  @override
+  Future<void> addComment(Post post, String text) async {
+    await _client.from('community_comments').insert({
+      'post_id': post.id,
+      'author_id': _userId,
+      'body': text.trim(),
+    });
+    await refresh();
+  }
+}
+
 /// One shared instance used by all screens.
-/// Later: final CommunityRepository communityRepo = SupabaseCommunityRepository();
-final CommunityRepository communityRepo = InMemoryCommunityRepository();
+/// Uses Supabase instead of local demo data.
+final CommunityRepository communityRepo = SupabaseCommunityRepository();

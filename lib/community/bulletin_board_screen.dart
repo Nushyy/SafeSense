@@ -4,6 +4,7 @@ import 'community_data.dart';
 import 'create_post_screen.dart';
 import 'post_card.dart';
 import 'post_detail_screen.dart';
+import '../components/BottomNav/bottom_nav_scaffold.dart';
 
 class BulletinBoardScreen extends StatefulWidget {
   const BulletinBoardScreen({super.key});
@@ -43,10 +44,10 @@ class _BulletinBoardScreenState extends State<BulletinBoardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      // TODO: the team's navigation bar goes here (bottomNavigationBar).
-      body: Column(
+    return BottomNavScaffold(
+      currentIndex: 3,
+      title: 'SafeSense',
+      child: Column(
         children: [
           _Header(
             area: _area,
@@ -72,7 +73,6 @@ class _BulletinBoardScreenState extends State<BulletinBoardScreen> {
                     final post = posts[i];
                     return PostCard(
                       post: post,
-                      onLike: () => communityRepo.toggleLike(post),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -125,12 +125,12 @@ class _Header extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Bulletin Board',
-                      style: TextStyle(
+                        style: TextStyle(
                         color: Colors.white,
-                        fontSize: 24,
+                        fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) - 1,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
