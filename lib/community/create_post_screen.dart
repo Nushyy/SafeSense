@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import 'community_data.dart';
+import '../components/BottomNav/bottom_nav_scaffold.dart';
 
 class CreatePostScreen extends StatefulWidget {
   final Suburb? initialArea;
@@ -16,6 +17,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _bodyController = TextEditingController();
   PostCategory _category = PostCategory.watch;
   Suburb? _area;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -45,37 +47,68 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    final area = _area!;
-    await communityRepo.addPost(
-      area: area,
-      category: _category,
-      title: _titleController.text.trim(),
-      body: _bodyController.text.trim(),
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('Posted to ${area.name}')));
-    Navigator.pop(context);
+    if (_isSubmitting || !_formKey.currentState!.validate()) return;
+    final area = _area;
+    if (area == null) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      await communityRepo.addPost(
+        area: area,
+        category: _category,
+        title: _titleController.text.trim(),
+        body: _bodyController.text.trim(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Posted to ${area.name}')),
+      );
+      Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not publish your post. Please try again.'),
+        ),
+      );
+      debugPrint('Community post submission failed: $error');
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final allSuburbs = [for (final c in communityRepo.cities) ...c.suburbs];
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.darkBlue,
-        foregroundColor: Colors.white,
-        title: const Text('New post'),
-      ),
-      body: SafeArea(
-        child: Form(
+    return BottomNavScaffold(
+      currentIndex: 3,
+      title: 'SafeSense',
+      child: Form(
           key: _formKey,
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'Back to Bulletin Board',
+                    color: AppColors.textPrimary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'New Post',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) - 1,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               const Text('Category',
                   style: TextStyle(
                       color: AppColors.textPrimary,
@@ -117,9 +150,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 controller: _titleController,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: _decoration('Title'),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Add a short title'
-                    : null,
+                validator: (v) {
+                  final title = v?.trim() ?? '';
+                  if (title.isEmpty) return 'Add a short title';
+                  if (title.length > 150) return 'Use 150 characters or fewer';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -128,9 +164,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 minLines: 4,
                 maxLines: 8,
                 decoration: _decoration('What is happening?'),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Describe what happened'
-                    : null,
+                validator: (v) {
+                  final body = v?.trim() ?? '';
+                  if (body.isEmpty) return 'Describe what happened';
+                  if (body.length > 5000) return 'Use 5000 characters or fewer';
+                  return null;
+                },
               ),
               const SizedBox(height: 8),
               const Text(
@@ -143,12 +182,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   backgroundColor: AppColors.primaryBlue,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                onPressed: _submit,
-                child: const Text('Post to bulletin board'),
+                onPressed: _isSubmitting ? null : _submit,
+                child: _isSubmitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Post to bulletin board'),
               ),
             ],
           ),
-        ),
       ),
     );
   }

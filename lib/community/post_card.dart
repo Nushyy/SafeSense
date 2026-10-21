@@ -51,7 +51,6 @@ class CategoryTag extends StatelessWidget {
 class PostCard extends StatelessWidget {
   final Post post;
   final VoidCallback? onTap;
-  final VoidCallback? onLike;
 
   /// false in the feed (body is cut after 3 lines), true on the detail screen.
   final bool expanded;
@@ -60,13 +59,11 @@ class PostCard extends StatelessWidget {
     super.key,
     required this.post,
     this.onTap,
-    this.onLike,
     this.expanded = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final liked = post.likedBy.contains(communityRepo.currentUser.id);
     final area = communityRepo.suburbById(post.areaId);
 
     return Container(
@@ -169,34 +166,9 @@ class PostCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 const Divider(height: 1, color: AppColors.divider),
                 const SizedBox(height: 8),
-                // Footer: like, comments, area
+                // Footer: comments and area
                 Row(
                   children: [
-                    InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: onLike,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 4),
-                        child: Row(
-                          children: [
-                            Icon(
-                              liked ? Icons.favorite : Icons.favorite_border,
-                              size: 20,
-                              color: liked
-                                  ? AppColors.danger
-                                  : AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 6),
-                            Text('${post.likeCount}',
-                                style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
                     const Icon(Icons.chat_bubble_outline,
                         size: 19, color: AppColors.textSecondary),
                     const SizedBox(width: 6),
