@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 
 import '../../../theme/colors.dart';
@@ -55,7 +56,12 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.12),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOutCubic,
+      ),
+    );
 
     _controller.forward();
   }
@@ -76,54 +82,36 @@ class _WelcomeHeaderState extends State<WelcomeHeader>
         position: _slideAnimation,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
           decoration: BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.border),
           ),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.blue.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(
-                  Icons.waving_hand_outlined,
-                  color: AppColors.blue,
-                  size: 24,
+              Text(
+                '$_greeting$_displayName!',
+                style: textTheme.titleMedium?.copyWith(
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                  height: 1.25,
                 ),
               ),
 
-              const SizedBox(width: AppSpacing.md),
+              const SizedBox(height: AppSpacing.xs),
 
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$_greeting$_displayName!',
-                      style: textTheme.titleLarge?.copyWith(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 21,
-                        height: 1.3,
-                      ),
-                    ),
-
-                    const SizedBox(height: AppSpacing.xs),
-
-                    Text(
-                      'Stay connected. Stay aware. Stay safe.',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+              Text(
+                'Stay connected. Stay aware. Stay safe.',
+                style: textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.3,
                 ),
               ),
             ],
