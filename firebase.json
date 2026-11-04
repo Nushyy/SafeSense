@@ -5,7 +5,8 @@
     "ignore": [
       "firebase.json",
       "**/node_modules/**",
-      ".last_build_id"
+      ".last_build_id",
+      "assets/.env"
     ],
     "rewrites": [
       {
@@ -25,24 +26,6 @@
       },
       {
         "source": "/flutter_bootstrap.js",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, must-revalidate"
-          }
-        ]
-      },
-      {
-        "source": "/main.dart.js",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, must-revalidate"
-          }
-        ]
-      },
-      {
-        "source": "/assets/.env",
         "headers": [
           {
             "key": "Cache-Control",

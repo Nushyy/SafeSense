@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -223,7 +222,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         return BottomNavScaffold(
           currentIndex: 4,
-          title: 'Profile',
+          title: 'SafeSense',
         child: RefreshIndicator(
           onRefresh: _refreshProfile,
           child: SingleChildScrollView(
@@ -232,7 +231,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Profile',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontSize: (theme.textTheme.titleLarge?.fontSize ?? 22) - 1,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
               _buildHeader(context),
               if (_loading) ...[
                 const SizedBox(height: 12),

@@ -17,6 +17,11 @@ class _BulletinBoardScreenState extends State<BulletinBoardScreen> {
   Suburb? _area; // null = all areas
   PostCategory? _category; // null = All
 
+  SupabaseCommunityRepository? get _remoteRepo =>
+      communityRepo is SupabaseCommunityRepository
+          ? communityRepo as SupabaseCommunityRepository
+          : null;
+
   void _openCreatePost() {
     Navigator.push(
       context,
@@ -62,10 +67,33 @@ class _BulletinBoardScreenState extends State<BulletinBoardScreen> {
               builder: (context, _) {
                 final posts =
                     communityRepo.posts(area: _area, category: _category);
-                if (posts.isEmpty) {
-                  return _EmptyState(onPost: _openCreatePost);
+                final repo = _remoteRepo;
+                if (repo?.isLoadingPosts == true && posts.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
                 }
-                return ListView.separated(
+                if (repo?.postsError != null && posts.isEmpty) {
+                  return _LoadError(
+                    message: repo!.postsError!,
+                    onRetry: repo.refresh,
+                  );
+                }
+                if (posts.isEmpty) {
+                  return RefreshIndicator(
+                    onRefresh: repo?.refresh ?? () async {},
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.sizeOf(context).height * 0.45,
+                          child: _EmptyState(onPost: _openCreatePost),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return RefreshIndicator(
+                  onRefresh: repo?.refresh ?? () async {},
+                  child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   itemCount: posts.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 14),
@@ -80,6 +108,7 @@ class _BulletinBoardScreenState extends State<BulletinBoardScreen> {
                       ),
                     );
                   },
+                  ),
                 );
               },
             ),
@@ -282,51 +311,153 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _AreaPickerSheet extends StatelessWidget {
+class _LoadError extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _LoadError({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_outlined, size: 42),
+              const SizedBox(height: 12),
+              Text(message, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try again'),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+class _AreaPickerSheet extends StatefulWidget {
   final Suburb? selected;
   final ValueChanged<Suburb?> onSelected;
+
   const _AreaPickerSheet({required this.selected, required this.onSelected});
 
   @override
+  State<_AreaPickerSheet> createState() => _AreaPickerSheetState();
+}
+
+class _AreaPickerSheetState extends State<_AreaPickerSheet> {
+  String _query = '';
+
+  @override
   Widget build(BuildContext context) {
-    const check = Icon(Icons.check, color: AppColors.primaryBlue);
+    final repo = communityRepo is SupabaseCommunityRepository
+        ? communityRepo as SupabaseCommunityRepository
+        : null;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+
     return SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7),
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
-              child: Text('Choose your area',
+      child: Padding(
+        padding: EdgeInsets.only(bottom: keyboardInset),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * 0.72,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
+                child: Text(
+                  'Choose your area',
                   style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.public),
-              title: const Text('All areas'),
-              trailing: selected == null ? check : null,
-              onTap: () => onSelected(null),
-            ),
-            for (final city in communityRepo.cities)
-              ExpansionTile(
-                initiallyExpanded: selected?.city == city.name,
-                leading: const Icon(Icons.location_city),
-                title: Text(city.name),
-                children: [
-                  for (final s in city.suburbs)
-                    ListTile(
-                      contentPadding: const EdgeInsets.only(left: 72, right: 16),
-                      title: Text(s.name),
-                      trailing: selected?.id == s.id ? check : null,
-                      onTap: () => onSelected(s),
-                    ),
-                ],
+                    color: AppColors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-          ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                child: TextField(
+                  autofocus: false,
+                  decoration: const InputDecoration(
+                    hintText: 'Search town, suburb or province',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  onChanged: (value) => setState(() => _query = value.trim().toLowerCase()),
+                ),
+              ),
+              Expanded(
+                child: AnimatedBuilder(
+                  animation: communityRepo,
+                  builder: (context, _) {
+                    final groups = <City>[];
+                    for (final city in communityRepo.cities) {
+                      final matches = city.suburbs.where((area) =>
+                          area.name.toLowerCase().contains(_query) ||
+                          area.city.toLowerCase().contains(_query) ||
+                          city.name.toLowerCase().contains(_query)).toList();
+                      if (matches.isNotEmpty) groups.add(City(city.name, matches));
+                    }
+                    return ListView(
+                      children: [
+                        if (_query.isEmpty)
+                          ListTile(
+                            leading: const Icon(Icons.public),
+                            title: const Text('All areas'),
+                            trailing: widget.selected == null
+                                ? const Icon(Icons.check, color: AppColors.primaryBlue)
+                                : null,
+                            onTap: () => widget.onSelected(null),
+                          ),
+                        if (repo?.isLoadingAreas == true)
+                          const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                        if (repo?.areasError != null)
+                          ListTile(
+                            leading: const Icon(Icons.warning_amber_outlined),
+                            title: Text(repo!.areasError!),
+                            subtitle: const Text('Showing available fallback locations.'),
+                            trailing: TextButton(
+                              onPressed: repo.loadAreas,
+                              child: const Text('Retry'),
+                            ),
+                          ),
+                        if (groups.isEmpty && repo?.isLoadingAreas != true)
+                          const ListTile(title: Text('No matching locations found')),
+                        for (final city in groups)
+                          ExpansionTile(
+                            key: ValueKey('${city.name}:$_query'),
+                            initiallyExpanded: _query.isNotEmpty ||
+                                widget.selected?.city == city.name,
+                            leading: const Icon(Icons.location_city),
+                            title: Text(city.name),
+                            children: [
+                              for (final area in city.suburbs)
+                                ListTile(
+                                  contentPadding: const EdgeInsets.only(left: 56, right: 16),
+                                  title: Text(area.name),
+                                  subtitle: Text(area.city),
+                                  trailing: widget.selected?.id == area.id
+                                      ? const Icon(Icons.check, color: AppColors.primaryBlue)
+                                      : null,
+                                  onTap: () => widget.onSelected(area),
+                                ),
+                            ],
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,8 +1,10 @@
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../components/BottomNav/bottom_nav_scaffold.dart';
+import '../../../theme/colors.dart';
 import '../models/crime_category.dart';
 import '../models/report_status.dart';
 import '../services/crime_category_service.dart';
@@ -61,6 +63,14 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
       await future;
     } catch (_) {
       // FutureBuilder displays the error state.
+    }
+  }
+
+  void _goBackToReportIncident() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/report');
     }
   }
 
@@ -127,12 +137,22 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
+      color: AppColors.surface,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(
+          color: AppColors.navy,
+          width: 1.5,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Text(
@@ -143,8 +163,15 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                     ),
                   ),
                 ),
+
+                const SizedBox(width: 8),
+
                 Chip(
                   label: Text(status),
+                  side: const BorderSide(
+                    color: AppColors.teal,
+                    width: 1.5,
+                  ),
                 ),
               ],
             ),
@@ -166,7 +193,9 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                   size: 18,
                 ),
                 const SizedBox(width: 8),
-                Text('Incident: $incidentDate'),
+                Expanded(
+                  child: Text('Incident: $incidentDate'),
+                ),
               ],
             ),
 
@@ -179,10 +208,12 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                   size: 18,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  isAnonymous
-                      ? 'Identity hidden from public reports'
-                      : 'Non-anonymous report',
+                Expanded(
+                  child: Text(
+                    isAnonymous
+                        ? 'Identity hidden from public reports'
+                        : 'Non-anonymous report',
+                  ),
                 ),
               ],
             ),
@@ -208,85 +239,128 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     );
   }
 
+  Widget _buildPageHeading() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: _goBackToReportIncident,
+            icon: const Icon(Icons.arrow_back),
+            color: AppColors.navy,
+            tooltip: 'Back to Report Incident',
+          ),
+
+          const SizedBox(width: 8),
+
+          const Expanded(
+            child: Text(
+              'My Reports',
+              style: TextStyle(
+                fontSize: 21,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BottomNavScaffold(
       currentIndex: 2,
-      title: 'My Reports',
-      child: RefreshIndicator(
-        onRefresh: _refreshReports,
-        child: FutureBuilder<_MyReportsData>(
-          future: _reportsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState ==
-                ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
-            }
+      child: Column(
+        children: [
+          _buildPageHeading(),
 
-            if (snapshot.hasError) {
-              return ListView(
-                padding: const EdgeInsets.all(24),
-                children: [
-                  const SizedBox(height: 80),
-                  const Icon(
-                    Icons.error_outline,
-                    size: 48,
-                    color: Colors.red,
-                  ),
-                  const SizedBox(height: 16),
-                  const Center(
-                    child: Text(
-                      'Unable to load your reports.',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Center(
-                    child: OutlinedButton.icon(
-                      onPressed: _refreshReports,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Try Again'),
-                    ),
-                  ),
-                ],
-              );
-            }
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _refreshReports,
+              child: FutureBuilder<_MyReportsData>(
+                future: _reportsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
 
-            final data = snapshot.data;
+                  if (snapshot.hasError) {
+                    return ListView(
+                      padding: const EdgeInsets.all(24),
+                      children: [
+                        const SizedBox(height: 80),
 
-            if (data == null || data.reports.isEmpty) {
-              return ListView(
-                padding: const EdgeInsets.all(24),
-                children: const [
-                  SizedBox(height: 80),
-                  Icon(
-                    Icons.assignment_outlined,
-                    size: 56,
-                  ),
-                  SizedBox(height: 16),
-                  Center(
-                    child: Text(
-                      'You have not submitted any reports yet.',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              );
-            }
+                        const Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: Colors.red,
+                        ),
 
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: data.reports.length,
-              itemBuilder: (context, index) {
-                return _buildReportCard(
-                  data.reports[index],
-                  data,
-                );
-              },
-            );
-          },
-        ),
+                        const SizedBox(height: 16),
+
+                        const Center(
+                          child: Text(
+                            'Unable to load your reports.',
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        Center(
+                          child: OutlinedButton.icon(
+                            onPressed: _refreshReports,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Try Again'),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  final data = snapshot.data;
+
+                  if (data == null || data.reports.isEmpty) {
+                    return ListView(
+                      padding: const EdgeInsets.all(24),
+                      children: const [
+                        SizedBox(height: 80),
+
+                        Icon(
+                          Icons.assignment_outlined,
+                          size: 56,
+                        ),
+
+                        SizedBox(height: 16),
+
+                        Center(
+                          child: Text(
+                            'You have not submitted any reports yet.',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: data.reports.length,
+                    itemBuilder: (context, index) {
+                      return _buildReportCard(
+                        data.reports[index],
+                        data,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

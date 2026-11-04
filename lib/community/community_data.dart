@@ -343,11 +343,81 @@ class InMemoryCommunityRepository extends CommunityRepository {
 class SupabaseCommunityRepository extends InMemoryCommunityRepository {
   final SupabaseClient _client = Supabase.instance.client;
   List<Post> _remotePosts = [];
+  List<City>? _remoteCities;
+  Map<String, Suburb> _remoteAreasById = {};
+
+  bool isLoadingPosts = false;
+  bool isLoadingAreas = false;
+  String? postsError;
+  String? areasError;
 
   SupabaseCommunityRepository() {
-    refresh().catchError((Object error) {
-      debugPrint('Community feed loading failed: $error');
-    });
+    loadAreas();
+    refresh();
+  }
+
+  /// Until the first successful request, retain the existing nine suburbs.
+  @override
+  List<City> get cities => _remoteCities ?? super.cities;
+
+  @override
+  Suburb? suburbById(String id) =>
+      _remoteAreasById[id] ?? super.suburbById(id);
+
+  /// Load all locations from the public areas directory. Supabase's default
+  /// response limit is usually 1,000 rows, so request in pages explicitly.
+  Future<void> loadAreas() async {
+    if (isLoadingAreas) return;
+    isLoadingAreas = true;
+    areasError = null;
+    notifyListeners();
+
+    try {
+      final allRows = <Map<String, dynamic>>[];
+      const pageSize = 500;
+      var offset = 0;
+      while (true) {
+        final page = await _client
+            .from('areas')
+            .select('id, name, group_name, province, kind')
+            .order('province')
+            .order('group_name')
+            .order('name')
+            .range(offset, offset + pageSize - 1);
+        allRows.addAll(page);
+        if (page.length < pageSize) break;
+        offset += pageSize;
+      }
+
+      final grouped = <String, List<Suburb>>{};
+      final byId = <String, Suburb>{};
+      for (final row in allRows) {
+        final id = row['id'] as String;
+        final name = row['name'] as String;
+        final group = row['group_name'] as String;
+        final province = row['province'] as String;
+        // Suburbs belong under their city; towns are grouped by province.
+        final parent = group == province ? province : '$group, $province';
+        final area = Suburb(id, name, parent);
+        grouped.putIfAbsent(parent, () => <Suburb>[]).add(area);
+        byId[id] = area;
+      }
+
+      // Avoid replacing the existing selection list with an empty response.
+      if (byId.isEmpty) {
+        throw StateError('No community areas were returned by Supabase.');
+      }
+      final names = grouped.keys.toList()..sort();
+      _remoteCities = [for (final name in names) City(name, grouped[name]!)];
+      _remoteAreasById = byId;
+    } catch (error) {
+      areasError = 'Unable to load community areas. Please try again.';
+      debugPrint('Community areas loading failed: $error');
+      // Keep the last successful list, or the original local fallback.
+    } finally {
+      isLoadingAreas = false;
+      notifyListeners();
+    }
   }
 
   String get _userId {
@@ -369,59 +439,70 @@ class SupabaseCommunityRepository extends InMemoryCommunityRepository {
 
   /// Fetch the most recent posts and their comments and likes.
   Future<void> refresh() async {
-    if (_client.auth.currentUser == null) {
-      _remotePosts = [];
-      notifyListeners();
-      return;
-    }
-
-    final rows = await _client
-        .from('community_posts')
-        .select('id, area_id, author_id, category, title, body, created_at')
-        .order('created_at', ascending: false)
-        .limit(200);
-    final comments = await _client
-        .from('community_comments')
-        .select('id, post_id, author_id, body, created_at')
-        .order('created_at', ascending: true)
-        .limit(2000);
-    final likes = await _client
-        .from('community_post_likes')
-        .select('post_id, user_id')
-        .limit(5000);
-
-    final commentsByPost = <String, List<Comment>>{};
-    for (final row in comments) {
-      final id = row['post_id'] as String;
-      commentsByPost.putIfAbsent(id, () => []).add(Comment(
-            id: row['id'] as String,
-            author: _author(row['author_id'] as String),
-            text: row['body'] as String,
-            createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
-          ));
-    }
-    final likesByPost = <String, Set<String>>{};
-    for (final row in likes) {
-      final id = row['post_id'] as String;
-      likesByPost.putIfAbsent(id, () => <String>{})
-          .add(row['user_id'] as String);
-    }
-
-    _remotePosts = [
-      for (final row in rows)
-        Post(
-          id: row['id'] as String,
-          areaId: row['area_id'] as String,
-          author: _author(row['author_id'] as String),
-          category: PostCategory.values.byName(row['category'] as String),
-          title: row['title'] as String,
-          body: row['body'] as String,
-          createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
-          likedBy: likesByPost[row['id'] as String] ?? <String>{},
-          comments: commentsByPost[row['id'] as String] ?? <Comment>[],
-        ),
-    ];
+    if (isLoadingPosts) return;
+    isLoadingPosts = true;
+    postsError = null;
     notifyListeners();
+
+    try {
+      if (_client.auth.currentUser == null) {
+        _remotePosts = [];
+        return;
+      }
+
+      final rows = await _client
+          .from('community_posts')
+          .select('id, area_id, author_id, category, title, body, created_at')
+          .order('created_at', ascending: false)
+          .limit(200);
+      final comments = await _client
+          .from('community_comments')
+          .select('id, post_id, author_id, body, created_at')
+          .order('created_at', ascending: true)
+          .limit(2000);
+      final likes = await _client
+          .from('community_post_likes')
+          .select('post_id, user_id')
+          .limit(5000);
+
+      final commentsByPost = <String, List<Comment>>{};
+      for (final row in comments) {
+        final id = row['post_id'] as String;
+        commentsByPost.putIfAbsent(id, () => []).add(Comment(
+              id: row['id'] as String,
+              author: _author(row['author_id'] as String),
+              text: row['body'] as String,
+              createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
+            ));
+      }
+      final likesByPost = <String, Set<String>>{};
+      for (final row in likes) {
+        final id = row['post_id'] as String;
+        likesByPost.putIfAbsent(id, () => <String>{})
+            .add(row['user_id'] as String);
+      }
+
+      _remotePosts = [
+        for (final row in rows)
+          Post(
+            id: row['id'] as String,
+            areaId: row['area_id'] as String,
+            author: _author(row['author_id'] as String),
+            category: PostCategory.values.byName(row['category'] as String),
+            title: row['title'] as String,
+            body: row['body'] as String,
+            createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
+            likedBy: likesByPost[row['id'] as String] ?? <String>{},
+            comments: commentsByPost[row['id'] as String] ?? <Comment>[],
+          ),
+      ];
+    } catch (error) {
+      postsError = 'Unable to load community posts. Please try again.';
+      debugPrint('Community feed loading failed: $error');
+    } finally {
+      isLoadingPosts = false;
+      notifyListeners();
+    }
   }
 
   @override

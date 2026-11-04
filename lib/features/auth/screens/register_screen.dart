@@ -21,12 +21,39 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
+  bool _passwordVisible = false;
+  bool _confirmPasswordVisible = false;
+  bool _isRegistering = false;
+
+  bool get _hasMinimumLength => _passwordController.text.length >= 8;
+  bool get _hasUppercase => RegExp(r'[A-Z]').hasMatch(_passwordController.text);
+  bool get _hasLowercase => RegExp(r'[a-z]').hasMatch(_passwordController.text);
+  bool get _hasNumber => RegExp(r'[0-9]').hasMatch(_passwordController.text);
+  bool get _hasSymbol => RegExp(r'[^A-Za-z0-9\s]').hasMatch(_passwordController.text);
+
+  Widget _passwordRule(String label, bool satisfied) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          Icon(
+            satisfied ? Icons.check_circle_outline : Icons.radio_button_unchecked,
+            size: 18,
+            color: satisfied ? Colors.green.shade700 : Colors.grey.shade600,
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
+        ],
+      ),
+    );
+  }
+
   // Registers a new SafeSense user with Supabase.
   Future<void> _register() async {
-    // Stop registration if any field fails validation.
-    if (!_formKey.currentState!.validate()) {
+    if (_isRegistering || !_formKey.currentState!.validate()) {
       return;
     }
+    setState(() => _isRegistering = true);
 
     // Combine Name and Surname because the profiles table
     // currently stores them as full_name.
@@ -85,6 +112,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isRegistering = false);
     }
   }
 
@@ -270,24 +299,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Password
                 TextFormField(
                   controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
+                  obscureText: !_passwordVisible,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
                     labelText: 'Password',
-                    hintText: 'Create a password',
-                    prefixIcon: Icon(Icons.lock_outline),
-                    border: OutlineInputBorder(),
+                    hintText: 'Create a strong password',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      tooltip: _passwordVisible ? 'Hide password' : 'Show password',
+                      icon: Icon(_passwordVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                      onPressed: () => setState(() => _passwordVisible = !_passwordVisible),
+                    ),
+                    border: const OutlineInputBorder(),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter a password';
                     }
-
-                    if (value.length < 8) {
-                      return 'Password must contain at least 8 characters';
+                    if (value.length < 8 ||
+                        !RegExp(r'[A-Z]').hasMatch(value) ||
+                        !RegExp(r'[a-z]').hasMatch(value) ||
+                        !RegExp(r'[0-9]').hasMatch(value) ||
+                        !RegExp(r'[^A-Za-z0-9\s]').hasMatch(value)) {
+                      return 'Please meet all password requirements below';
                     }
-
                     return null;
                   },
+                ),
+
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _passwordRule('At least 8 characters', _hasMinimumLength),
+                      _passwordRule('One uppercase letter (A-Z)', _hasUppercase),
+                      _passwordRule('One lowercase letter (a-z)', _hasLowercase),
+                      _passwordRule('One number (0-9)', _hasNumber),
+                      _passwordRule('One special character (!, @, #, etc.)', _hasSymbol),
+                    ],
+                  ),
                 ),
 
                 const SizedBox(height: 16),
@@ -295,22 +349,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Confirm Password
                 TextFormField(
                   controller: _confirmPasswordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
+                  obscureText: !_confirmPasswordVisible,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  decoration: InputDecoration(
                     labelText: 'Confirm Password',
                     hintText: 'Enter your password again',
-                    prefixIcon: Icon(Icons.lock_outline),
-                    border: OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      tooltip: _confirmPasswordVisible ? 'Hide confirmation' : 'Show confirmation',
+                      icon: Icon(_confirmPasswordVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                      onPressed: () => setState(() => _confirmPasswordVisible = !_confirmPasswordVisible),
+                    ),
+                    border: const OutlineInputBorder(),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please confirm your password';
                     }
-
                     if (value != _passwordController.text) {
                       return 'Passwords do not match';
                     }
-
                     return null;
                   },
                 ),
@@ -321,8 +380,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _register,
-                    child: const Text('Register'),
+                    onPressed: _isRegistering ? null : _register,
+                    child: Text(_isRegistering ? 'Registering...' : 'Register'),
                   ),
                 ),
               ],
