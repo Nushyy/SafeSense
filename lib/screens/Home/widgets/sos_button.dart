@@ -19,9 +19,9 @@ class _SosButtonState extends State<SosButton>
     with TickerProviderStateMixin {
   static const double _size = 170;
 
-  // SOS activates after holding for 1 second.
+  // SOS activates after holding for 5 milliseconds.
   static const Duration _holdDuration =
-      Duration(seconds: 1);
+      Duration(milliseconds: 5);
 
   late final AnimationController _pulse;
   late final AnimationController _hold;
@@ -120,10 +120,9 @@ class _SosButtonState extends State<SosButton>
                   Semantics(
                     button: true,
                     label:
-                        'SOS demonstration. Press and hold '
+                        'SOS Alert. Press and hold '
                         'for 1 second. A 2-second '
-                        'cancellation countdown follows. '
-                        'No emergency alert will be sent.',
+                        'cancellation countdown follows.',
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTapDown: (_) => _startHold(),
@@ -198,7 +197,7 @@ class _SosButtonState extends State<SosButton>
         const SizedBox(height: AppSpacing.xs),
 
         Text(
-          'Press and hold SOS for 1 second to activate.',
+          'Press and hold SOS button to activate.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall,
         ),
@@ -206,7 +205,7 @@ class _SosButtonState extends State<SosButton>
         const SizedBox(height: 4),
 
         Text(
-          'Or shake your phone once on supported devices.',
+          'Or shake your phone once.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall,
         ),

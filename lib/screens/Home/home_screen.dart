@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -5,7 +6,6 @@ import '../../components/BottomNav/bottom_nav_scaffold.dart';
 import '../../theme/spacing.dart';
 
 import 'widgets/area_status_card.dart';
-import 'widgets/quick_action_row.dart';
 import 'widgets/recent_alerts_preview.dart';
 import 'widgets/sos_button.dart';
 import 'widgets/welcome_header.dart';
@@ -54,9 +54,6 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: AppSpacing.lg),
 
           const SosButton(),
-          const SizedBox(height: AppSpacing.lg),
-
-          const QuickActionRow(),
           const SizedBox(height: AppSpacing.lg),
 
           const RecentAlertsPreview(),

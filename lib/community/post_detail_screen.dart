@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import 'community_data.dart';
@@ -18,6 +17,7 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final _replyController = TextEditingController();
+  bool _isSending = false;
 
   @override
   void dispose() {
@@ -26,13 +26,37 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   Future<void> _sendReply() async {
+    if (_isSending) return;
+
     final text = _replyController.text.trim();
-
     if (text.isEmpty) return;
+    if (text.length > 2000) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Replies must be 2000 characters or fewer.')),
+      );
+      return;
+    }
 
-    _replyController.clear();
-
-    await communityRepo.addComment(widget.post, text);
+    setState(() => _isSending = true);
+    try {
+      await communityRepo.addComment(widget.post, text);
+      if (!mounted) return;
+      // Only clear the text submitted. Preserve anything typed while awaiting.
+      if (_replyController.text.trim() == text) {
+        _replyController.clear();
+      }
+      FocusScope.of(context).unfocus();
+    } catch (error) {
+      debugPrint('Community reply submission failed: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not send your reply. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
   }
 
   @override
@@ -47,13 +71,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       body: AnimatedBuilder(
         animation: communityRepo,
         builder: (context, _) {
-          // Retrieve the latest version of this post.
+          // Retrieve the latest version of this post after a repository refresh.
           final matchingPosts = communityRepo.posts().where(
                 (item) => item.id == widget.post.id,
               );
-
-          // Use the original post if it is not in the
-          // repository's current list.
           final currentPost = matchingPosts.isNotEmpty
               ? matchingPosts.first
               : widget.post;
@@ -95,45 +116,51 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 child: SafeArea(
                   top: false,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      12,
-                      8,
-                      8,
-                      8,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
                     child: Row(
                       children: [
                         Expanded(
                           child: TextField(
                             controller: _replyController,
-                            textCapitalization:
-                                TextCapitalization.sentences,
+                            enabled: !_isSending,
+                            textCapitalization: TextCapitalization.sentences,
+                            minLines: 1,
+                            maxLines: 4,
+                            maxLength: 2000,
                             decoration: InputDecoration(
                               hintText: 'Write a reply',
+                              counterText: '',
                               filled: true,
                               fillColor: AppColors.softSurface,
-                              contentPadding:
-                                  const EdgeInsets.symmetric(
+                              contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 10,
                               ),
                               border: OutlineInputBorder(
-                                borderRadius:
-                                    BorderRadius.circular(24),
+                                borderRadius: BorderRadius.circular(24),
                                 borderSide: BorderSide.none,
                               ),
                             ),
+                            onSubmitted: (_) => _sendReply(),
                           ),
                         ),
                         const SizedBox(width: 4),
                         IconButton.filled(
                           style: IconButton.styleFrom(
-                            backgroundColor:
-                                AppColors.primaryBlue,
+                            backgroundColor: AppColors.primaryBlue,
                           ),
-                          onPressed: _sendReply,
-                          icon: const Icon(Icons.send),
-                          tooltip: 'Send reply',
+                          onPressed: _isSending ? null : _sendReply,
+                          icon: _isSending
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.send),
+                          tooltip: _isSending ? 'Sending reply' : 'Send reply',
                         ),
                       ],
                     ),
@@ -151,9 +178,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 class _CommentTile extends StatelessWidget {
   final Comment comment;
 
-  const _CommentTile({
-    required this.comment,
-  });
+  const _CommentTile({required this.comment});
 
   @override
   Widget build(BuildContext context) {
@@ -162,10 +187,7 @@ class _CommentTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          UserAvatar(
-            user: comment.author,
-            radius: 16,
-          ),
+          UserAvatar(user: comment.author, radius: 16),
           const SizedBox(width: 10),
           Expanded(
             child: Container(

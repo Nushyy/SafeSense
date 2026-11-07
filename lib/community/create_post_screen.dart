@@ -46,6 +46,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
+  Future<void> _chooseArea() async {
+    final selected = await showModalBottomSheet<Suburb>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _SearchableAreaPicker(selectedId: _area?.id),
+    );
+    if (selected != null && mounted) {
+      setState(() => _area = selected);
+      _formKey.currentState?.validate();
+    }
+  }
+
   Future<void> _submit() async {
     if (_isSubmitting || !_formKey.currentState!.validate()) return;
     final area = _area;
@@ -79,120 +95,226 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allSuburbs = [for (final c in communityRepo.cities) ...c.suburbs];
-
     return BottomNavScaffold(
       currentIndex: 3,
       title: 'SafeSense',
       child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back),
-                    tooltip: 'Back to Bulletin Board',
-                    color: AppColors.textPrimary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'New Post',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) - 1,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Text('Category',
-                  style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final c in PostCategory.values)
-                    ChoiceChip(
-                      label: Text(c.tagLabel),
-                      selected: _category == c,
-                      selectedColor: c.color.withValues(alpha: 0.18),
-                      labelStyle: TextStyle(
-                        color: _category == c
-                            ? c.color
-                            : AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      onSelected: (_) => setState(() => _category = c),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<Suburb>(
-                initialValue: _area,
-                isExpanded: true,
-                decoration: _decoration('Area'),
-                items: [
-                  for (final s in allSuburbs)
-                    DropdownMenuItem(value: s, child: Text(s.label)),
-                ],
-                onChanged: (v) => setState(() => _area = v),
-                validator: (v) => v == null ? 'Choose an area' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _titleController,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: _decoration('Title'),
-                validator: (v) {
-                  final title = v?.trim() ?? '';
-                  if (title.isEmpty) return 'Add a short title';
-                  if (title.length > 150) return 'Use 150 characters or fewer';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _bodyController,
-                textCapitalization: TextCapitalization.sentences,
-                minLines: 4,
-                maxLines: 8,
-                decoration: _decoration('What is happening?'),
-                validator: (v) {
-                  final body = v?.trim() ?? '';
-                  if (body.isEmpty) return 'Describe what happened';
-                  if (body.length > 5000) return 'Use 5000 characters or fewer';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Share what you saw, not who you think did it. In an emergency, call 10111.',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primaryBlue,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.arrow_back),
+                  tooltip: 'Back to Bulletin Board',
+                  color: AppColors.textPrimary,
                 ),
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Post to bulletin board'),
+                const SizedBox(width: 8),
+                Text(
+                  'New Post',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize:
+                        (Theme.of(context).textTheme.titleLarge?.fontSize ?? 22) - 1,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text('Category',
+                style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final c in PostCategory.values)
+                  ChoiceChip(
+                    label: Text(c.tagLabel),
+                    selected: _category == c,
+                    selectedColor: c.color.withValues(alpha: 0.18),
+                    labelStyle: TextStyle(
+                      color: _category == c ? c.color : AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    onSelected: (_) => setState(() => _category = c),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            FormField<Suburb>(
+              validator: (_) => _area == null ? 'Choose an area' : null,
+              builder: (field) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  InkWell(
+                    onTap: _isSubmitting ? null : _chooseArea,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InputDecorator(
+                      decoration: _decoration('Area').copyWith(
+                        errorText: field.errorText,
+                        suffixIcon: const Icon(Icons.search),
+                      ),
+                      child: Text(
+                        _area?.label ?? 'Search South African locations',
+                        style: TextStyle(
+                          color: _area == null
+                              ? AppColors.textSecondary
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _titleController,
+              textCapitalization: TextCapitalization.sentences,
+              maxLength: 150,
+              decoration: _decoration('Title'),
+              validator: (v) {
+                final title = v?.trim() ?? '';
+                if (title.isEmpty) return 'Add a short title';
+                if (title.length > 150) return 'Use 150 characters or fewer';
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _bodyController,
+              textCapitalization: TextCapitalization.sentences,
+              minLines: 4,
+              maxLines: 8,
+              maxLength: 5000,
+              decoration: _decoration('What is happening?'),
+              validator: (v) {
+                final body = v?.trim() ?? '';
+                if (body.isEmpty) return 'Describe what happened';
+                if (body.length > 5000) return 'Use 5000 characters or fewer';
+                return null;
+              },
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Share what you saw, not who you think did it. In an emergency, call 10111.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primaryBlue,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: _isSubmitting ? null : _submit,
+              child: _isSubmitting
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Post to bulletin board'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchableAreaPicker extends StatefulWidget {
+  final String? selectedId;
+  const _SearchableAreaPicker({this.selectedId});
+
+  @override
+  State<_SearchableAreaPicker> createState() => _SearchableAreaPickerState();
+}
+
+class _SearchableAreaPickerState extends State<_SearchableAreaPicker> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: FractionallySizedBox(
+        heightFactor: 0.78,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Choose an area',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search town, suburb, city or province',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onChanged: (value) => setState(() => _query = value.trim().toLowerCase()),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: AnimatedBuilder(
+                  animation: communityRepo,
+                  builder: (context, _) {
+                    final areas = [
+                      for (final city in communityRepo.cities) ...city.suburbs,
+                    ];
+                    final results = areas.where((area) =>
+                        area.name.toLowerCase().contains(_query) ||
+                        area.city.toLowerCase().contains(_query)).toList();
+                    results.sort((a, b) {
+                      final byName = a.name.compareTo(b.name);
+                      return byName != 0 ? byName : a.city.compareTo(b.city);
+                    });
+                    if (results.isEmpty) {
+                      return const Center(child: Text('No matching areas found.'));
+                    }
+                    return ListView.builder(
+                      itemCount: results.length,
+                      itemBuilder: (context, index) {
+                        final area = results[index];
+                        return ListTile(
+                          title: Text(area.name),
+                          subtitle: Text(area.city),
+                          trailing: widget.selectedId == area.id
+                              ? const Icon(Icons.check, color: AppColors.primaryBlue)
+                              : null,
+                          onTap: () => Navigator.pop(context, area),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ],
           ),
+        ),
       ),
     );
   }

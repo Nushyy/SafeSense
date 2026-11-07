@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -29,6 +30,8 @@ import '../../screens/map/crime_map_screen.dart';
 
 // Profile
 import '../../screens/profile/profile_screen.dart';
+import '../../screens/profile/notifications_screen.dart';
+import '../../screens/profile/about_safesense_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -42,7 +45,10 @@ class AppRouter {
       ),
 
       // Authentication
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const LoginScreen(),
+      ),
 
       GoRoute(
         path: '/register',
@@ -62,7 +68,10 @@ class AppRouter {
       ),
 
       // Home Dashboard
-      GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
+      GoRoute(
+        path: '/home',
+        builder: (context, state) => const HomeScreen(),
+      ),
 
       // SOS Prototype
       GoRoute(
@@ -86,6 +95,18 @@ class AppRouter {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
+      ),
+
+      // Notification Preferences
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+
+      // About SafeSense
+      GoRoute(
+        path: '/about',
+        builder: (context, state) => const AboutSafeSenseScreen(),
       ),
 
       // Crime Map
@@ -117,13 +138,15 @@ class AppRouter {
       // Settings
       GoRoute(
         path: '/settings',
-        builder: (context, state) => const ComingSoonScreen(title: 'Settings'),
+        builder: (context, state) =>
+            const ComingSoonScreen(title: 'Settings'),
       ),
 
       // Language Settings
       GoRoute(
         path: '/settings/language',
-        builder: (context, state) => const ComingSoonScreen(title: 'Language'),
+        builder: (context, state) =>
+            const ComingSoonScreen(title: 'Language'),
       ),
 
       // Help
@@ -137,7 +160,10 @@ class AppRouter {
 }
 
 class ComingSoonScreen extends StatelessWidget {
-  const ComingSoonScreen({super.key, required this.title});
+  const ComingSoonScreen({
+    super.key,
+    required this.title,
+  });
 
   final String title;
 
@@ -150,24 +176,17 @@ class ComingSoonScreen extends StatelessWidget {
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.construction_outlined, size: 64),
+              const Icon(
+                Icons.construction_outlined,
+                size: 64,
+              ),
               const SizedBox(height: 16),
               Text(
-                title,
-                style: Theme.of(context).textTheme.headlineSmall,
+                '$title is coming soon.',
                 textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'This feature is currently being integrated.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () => context.go('/home'),
-                icon: const Icon(Icons.home_outlined),
-                label: const Text('Back to Home'),
+                style: Theme.of(context).textTheme.titleMedium,
               ),
             ],
           ),
