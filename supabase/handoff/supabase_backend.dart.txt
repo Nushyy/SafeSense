@@ -1,0 +1,215 @@
+// OPTIONAL STARTING POINT for the backend owner (rename to .dart and put it
+// in lib/services/saps/ if you want to use it). Needs: flutter pub add supabase_flutter
+// Pair it with supabase/handoff/saps_setup.sql. Then in lib/main_saps.dart:
+//
+//   await Supabase.initialize(url: ..., anonKey: ...);
+//   SapsAuthService.instance = SupabaseSapsAuth();
+//   SapsCaseService.instance = SupabaseSapsCases();
+//
+// Security rule: the DATABASE decides who is an officer (RLS). This code only
+// gives clear errors. Hiding a screen is not security.
+
+import 'dart:async';
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'saps_auth_service.dart';
+import 'saps_case.dart';
+import 'saps_case_service.dart';
+
+SupabaseClient get _db => Supabase.instance.client;
+
+class SupabaseSapsAuth extends SapsAuthService {
+  static const bool requireMfa =
+      bool.fromEnvironment('SAPS_REQUIRE_MFA', defaultValue: false);
+
+  @override
+  Stream<void> get signedOut => _db.auth.onAuthStateChange
+      .where((s) => s.event == AuthChangeEvent.signedOut);
+
+  Future<bool> _isOfficer() async {
+    final user = _db.auth.currentUser;
+    if (user == null) return false;
+    final row = await _db.from('profiles').select('role').eq('id', user.id).maybeSingle();
+    final role = row?['role'];
+    return role == 'saps' || role == 'admin';
+  }
+
+  @override
+  Future<SapsSignInResult> signIn(String email, String password) async {
+    try {
+      await _db.auth.signInWithPassword(email: email.trim(), password: password);
+    } on AuthException {
+      return SapsSignInResult.badCredentials;
+    } catch (_) {
+      return SapsSignInResult.offline;
+    }
+    try {
+      if (!await _isOfficer()) {
+        await _db.auth.signOut();
+        return SapsSignInResult.notAuthorised;
+      }
+      final aal = _db.auth.mfa.getAuthenticatorAssuranceLevel();
+      final hasFactor = aal.nextLevel == AuthenticatorAssuranceLevels.aal2;
+      if (hasFactor && aal.currentLevel != AuthenticatorAssuranceLevels.aal2) {
+        return SapsSignInResult.needsCode;
+      }
+      if (requireMfa && !hasFactor) {
+        await _db.auth.signOut();
+        return SapsSignInResult.mfaNotSetUp;
+      }
+      return SapsSignInResult.ok;
+    } catch (_) {
+      await _db.auth.signOut();
+      return SapsSignInResult.offline;
+    }
+  }
+
+  @override
+  Future<bool> verifyCode(String code) async {
+    try {
+      final factors = await _db.auth.mfa.listFactors();
+      if (factors.totp.isEmpty) return false;
+      await _db.auth.mfa.challengeAndVerify(factorId: factors.totp.first.id, code: code);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> isFullyAuthorised() async {
+    if (_db.auth.currentSession == null) return false;
+    try {
+      if (!await _isOfficer()) {
+        await _db.auth.signOut();
+        return false;
+      }
+      final aal = _db.auth.mfa.getAuthenticatorAssuranceLevel();
+      final hasFactor = aal.nextLevel == AuthenticatorAssuranceLevels.aal2;
+      if (hasFactor && aal.currentLevel != AuthenticatorAssuranceLevels.aal2) {
+        await _db.auth.signOut();
+        return false;
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<OfficerProfile> profile() async {
+    final user = _db.auth.currentUser;
+    if (user == null) return const OfficerProfile(name: 'Officer');
+    try {
+      final row = await _db.from('profiles').select('full_name, station').eq('id', user.id).maybeSingle();
+      return OfficerProfile(
+        name: (row?['full_name'] as String?) ?? user.email ?? 'Officer',
+        station: row?['station'] as String?,
+      );
+    } catch (_) {
+      return OfficerProfile(name: user.email ?? 'Officer');
+    }
+  }
+
+  @override
+  Future<void> signOut() => _db.auth.signOut();
+}
+
+class SupabaseSapsCases extends SapsCaseService {
+  final Set<String> _known = {};
+  final Set<String> _logged = {};
+  bool _firstLoad = true;
+  bool _started = false;
+  RealtimeChannel? _channel;
+  Timer? _poll;
+
+  @override
+  Future<void> start() async {
+    if (_started) return;
+    _started = true;
+    _firstLoad = true;
+    _known.clear();
+    _logged.clear();
+    await refresh();
+    _channel = _db
+        .channel('saps-cases')
+        .onPostgresChanges(event: PostgresChangeEvent.all, schema: 'public', table: 'sos_alerts', callback: (_) => refresh())
+        .onPostgresChanges(event: PostgresChangeEvent.all, schema: 'public', table: 'reports', callback: (_) => refresh())
+        .subscribe((status, [error]) {
+      connected.value = status == RealtimeSubscribeStatus.subscribed;
+    });
+    _poll = Timer.periodic(const Duration(seconds: 20), (_) => refresh());
+  }
+
+  @override
+  Future<void> stop() async {
+    _started = false;
+    _poll?.cancel();
+    final ch = _channel;
+    _channel = null;
+    if (ch != null) await _db.removeChannel(ch);
+    cases.value = const [];
+    connected.value = false;
+    lastUpdated.value = null;
+  }
+
+  @override
+  Future<void> refresh() async {
+    try {
+      final rows = await _db.from('saps_cases').select().order('created_at', ascending: false).limit(300);
+      final list = (rows as List).map((r) => SapsCase.fromMap(Map<String, dynamic>.from(r as Map))).toList();
+      for (final c in list) {
+        if (_known.add(c.id) && !_firstLoad && c.isSos && c.status == 'active') {
+          announceNewSos(c);
+        }
+      }
+      _firstLoad = false;
+      cases.value = list;
+      lastUpdated.value = DateTime.now();
+      loadError.value = null;
+    } catch (_) {
+      loadError.value = "Couldn't load cases. Check your connection.";
+    }
+  }
+
+  @override
+  Future<void> setStatus(SapsCase c, String status, {String? reason}) async {
+    await _db.rpc('saps_set_status', params: {
+      'p_kind': c.kindKey,
+      'p_id': c.id,
+      'p_status': status,
+      'p_reason': reason,
+    });
+    await refresh();
+  }
+
+  @override
+  Future<void> logOpened(SapsCase c) async {
+    if (!_logged.add(c.id)) return;
+    try {
+      await _db.rpc('saps_log_open', params: {'p_kind': c.kindKey, 'p_id': c.id});
+    } catch (_) {}
+  }
+
+  @override
+  Future<List<AuditEntry>> audit(SapsCase c) async {
+    final rows = await _db
+        .from('case_audit')
+        .select('action, reason, created_at, profiles(full_name)')
+        .eq('case_id', c.id)
+        .order('created_at', ascending: false)
+        .limit(20);
+    return (rows as List).map((r) {
+      final m = Map<String, dynamic>.from(r as Map);
+      final p = m['profiles'];
+      final name = (p is Map ? p['full_name'] : null) as String?;
+      return AuditEntry(
+        action: m['action'] as String,
+        reason: m['reason'] as String?,
+        officer: name ?? 'Officer',
+        at: DateTime.parse(m['created_at'] as String).toLocal(),
+      );
+    }).toList();
+  }
+}
