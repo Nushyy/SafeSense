@@ -1,8 +1,33 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'theme/app_colors.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'community/bulletin_board_screen.dart';
+import 'community/community_data.dart';
+import 'community/supabase_community_repository.dart';
+import 'config/supabase_config.dart';
+import 'theme/app_colors.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Read the Supabase details from .env (see .env.example).
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    debugPrint('No .env file found: running on dummy data.');
+  }
+
+  // Use the real database when the details are there, otherwise dummy data.
+  if (SupabaseConfig.isConfigured) {
+    await Supabase.initialize(
+      url: SupabaseConfig.url,
+      publishableKey: SupabaseConfig.anonKey,
+    );
+    communityRepo = SupabaseCommunityRepository();
+    unawaited(communityRepo.init());
+  }
+
   runApp(const SafeSenseApp());
 }
 

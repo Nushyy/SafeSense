@@ -1,6 +1,8 @@
-
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
+import '../messaging/inbox_screen.dart';
+import '../messaging/messaging_rep.dart';
+import '../theme/app_colors.dart';
+import 'area_picker.dart';
 import 'bottom_nav_scaffold.dart';
 import 'community_data.dart';
 import 'create_post_screen.dart';
@@ -18,7 +20,7 @@ class BulletinBoardScreen extends StatefulWidget {
 class _BulletinBoardScreenState
     extends State<BulletinBoardScreen> {
   Suburb? _area;
-  PostCategory? _category;
+  CrimeCategory? _category;
 
   void _openCreatePost() {
     Navigator.push(
@@ -29,31 +31,21 @@ class _BulletinBoardScreenState
     );
   }
 
-  void _openAreaPicker() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(20),
-        ),
-      ),
-      builder: (sheetContext) => _AreaPickerSheet(
-        selected: _area,
-        onSelected: (area) {
-          setState(() => _area = area);
-          Navigator.pop(sheetContext);
-        },
-      ),
+  Future<void> _openAreaPicker() async {
+    final choice = await showAreaPicker(
+      context,
+      selected: _area,
+      allowAll: true, // "Other" is only offered on the Create post screen
     );
+    if (choice == null) return;
+    setState(() => _area = choice.area);
   }
 
-  void _openPostDetail(dynamic post) {
+  void _openPostDetail(Post post, {bool focusReply = false}) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PostDetailScreen(post: post),
+        builder: (_) => PostDetailScreen(post: post, focusReply: focusReply),
       ),
     );
   }
@@ -78,6 +70,15 @@ class _BulletinBoardScreenState
             child: AnimatedBuilder(
               animation: communityRepo,
               builder: (context, _) {
+                if (communityRepo.isLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (communityRepo.errorMessage != null) {
+                  return _ErrorState(
+                    message: communityRepo.errorMessage!,
+                    onRetry: communityRepo.init,
+                  );
+                }
                 final posts = communityRepo.posts(
                   area: _area,
                   category: _category,
@@ -102,6 +103,7 @@ class _BulletinBoardScreenState
                     return PostCard(
                       post: post,
                       onTap: () => _openPostDetail(post),
+                      onComment: () => _openPostDetail(post, focusReply: true),
                     );
                   },
                 );
@@ -116,10 +118,10 @@ class _BulletinBoardScreenState
 
 class _Header extends StatelessWidget {
   final Suburb? area;
-  final PostCategory? category;
+  final CrimeCategory? category;
   final VoidCallback onPost;
   final VoidCallback onAreaTap;
-  final ValueChanged<PostCategory?> onCategory;
+  final ValueChanged<CrimeCategory?> onCategory;
 
   const _Header({
     required this.area,
@@ -131,7 +133,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final categories = PostCategory.values;
+    final categories = communityRepo.categories;
 
     return Container(
       decoration: const BoxDecoration(
@@ -165,8 +167,17 @@ class _Header extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (MessagingRepository.isAvailable)
+                    IconButton(
+                      tooltip: 'Messages',
+                      icon: const Icon(Icons.mail_outline, color: Colors.white),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const InboxScreen()),
+                      ),
+                    ),
                   Material(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(20),
@@ -250,7 +261,7 @@ class _Header extends StatelessWidget {
                     final item = categories[index - 1];
 
                     return _FilterChip(
-                      label: item.chipLabel,
+                      label: item.name,
                       selected: category == item,
                       onTap: () => onCategory(item),
                     );
@@ -281,7 +292,7 @@ class _FilterChip extends StatelessWidget {
     return Material(
       color: selected
           ? Colors.white
-          : Colors.white.withOpacity(0.14),
+          : Colors.white.withValues(alpha: 0.14),
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
@@ -301,6 +312,39 @@ class _FilterChip extends StatelessWidget {
               fontSize: 14,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorState({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined,
+                size: 48, color: AppColors.textLight),
+            const SizedBox(height: 12),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary)),
+            const SizedBox(height: 16),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue),
+              onPressed: onRetry,
+              child: const Text('Try again'),
+            ),
+          ],
         ),
       ),
     );
@@ -350,75 +394,6 @@ class _EmptyState extends StatelessWidget {
               onPressed: onPost,
               child: const Text('Create post'),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AreaPickerSheet extends StatelessWidget {
-  final Suburb? selected;
-  final ValueChanged<Suburb?> onSelected;
-
-  const _AreaPickerSheet({
-    required this.selected,
-    required this.onSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    const check = Icon(
-      Icons.check,
-      color: AppColors.primaryBlue,
-    );
-
-    return SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.7,
-        ),
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
-              child: Text(
-                'Choose your area',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.public),
-              title: const Text('All areas'),
-              trailing: selected == null ? check : null,
-              onTap: () => onSelected(null),
-            ),
-            for (final city in communityRepo.cities)
-              ExpansionTile(
-                initiallyExpanded:
-                    selected?.city == city.name,
-                leading: const Icon(Icons.location_city),
-                title: Text(city.name),
-                children: [
-                  for (final suburb in city.suburbs)
-                    ListTile(
-                      contentPadding: const EdgeInsets.only(
-                        left: 72,
-                        right: 16,
-                      ),
-                      title: Text(suburb.name),
-                      trailing: selected?.id == suburb.id
-                          ? check
-                          : null,
-                      onTap: () => onSelected(suburb),
-                    ),
-                ],
-              ),
           ],
         ),
       ),

@@ -1,6 +1,8 @@
 import 'package:file_selector/file_selector.dart';
+// import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import 'area_picker.dart';
 import 'community_data.dart';
 import 'post_card.dart';
 
@@ -41,9 +43,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
-  PostCategory _category = PostCategory.watch;
+  final _otherController = TextEditingController();
+  CrimeCategory? _category;
+  String? _categoryError;
   Suburb? _area;
+  bool _isOther = false; // user chose "Other" (own town/village)
+  String? _areaError;
   PostAttachment? _attachment; // only 1 picture or document per post
+  bool _posting = false;
 
   @override
   void initState() {
@@ -55,6 +62,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   void dispose() {
     _titleController.dispose();
     _bodyController.dispose();
+    _otherController.dispose();
     super.dispose();
   }
 
@@ -178,25 +186,56 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ));
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    final area = _area!;
-    await communityRepo.addPost(
-      area: area,
-      category: _category,
-      title: _titleController.text.trim(),
-      body: _bodyController.text.trim(),
-      attachment: _attachment,
+  Future<void> _chooseArea() async {
+    final choice = await showAreaPicker(
+      context,
+      selected: _area,
+      allowOther: true, // "Other" only exists on this screen
+      otherSelected: _isOther,
     );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('Posted to ${area.name}')));
-    Navigator.pop(context);
+    if (choice == null) return;
+    setState(() {
+      _isOther = choice.isOther;
+      _area = choice.area;
+      _areaError = null;
+    });
+  }
+
+  Future<void> _submit() async {
+    final formOk = _formKey.currentState!.validate();
+    final areaOk = _isOther || _area != null;
+    setState(() {
+      _areaError = areaOk ? null : 'Choose an area';
+      _categoryError = _category == null ? 'Choose a type of crime' : null;
+    });
+    if (!formOk || !areaOk || _category == null) return;
+
+    final other = _otherController.text.trim();
+    setState(() => _posting = true);
+    try {
+      await communityRepo.addPost(
+        area: _isOther ? null : _area,
+        otherArea: _isOther ? other : null,
+        category: _category!,
+        title: _titleController.text.trim(),
+        body: _bodyController.text.trim(),
+        attachment: _attachment,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Posted to ${_isOther ? other : _area!.name}')));
+      Navigator.pop(context);
+    } catch (e) {
+      debugPrint('addPost failed: $e');
+      if (!mounted) return;
+      setState(() => _posting = false);
+      _snack('Could not post. Check your connection and try again.');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final allSuburbs = [for (final c in communityRepo.cities) ...c.suburbs];
+    final categories = communityRepo.categories;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -211,42 +250,78 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              const Text('Category',
+              const Text('Type of crime',
                   style: TextStyle(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final c in PostCategory.values)
-                    ChoiceChip(
-                      label: Text(c.tagLabel),
-                      selected: _category == c,
-                      selectedColor: c.color.withValues(alpha: 0.18),
-                      labelStyle: TextStyle(
-                        color: _category == c
-                            ? c.color
-                            : AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
+              if (categories.isEmpty)
+                const Text('No crime types found.',
+                    style: TextStyle(color: AppColors.textSecondary))
+              else
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final c in categories)
+                      ChoiceChip(
+                        label: Text(c.name),
+                        selected: _category == c,
+                        selectedColor: c.color.withValues(alpha: 0.18),
+                        labelStyle: TextStyle(
+                          color: _category == c
+                              ? c.color
+                              : AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        onSelected: (_) => setState(() {
+                          _category = c;
+                          _categoryError = null;
+                        }),
                       ),
-                      onSelected: (_) => setState(() => _category = c),
-                    ),
-                ],
-              ),
+                  ],
+                ),
+              if (_categoryError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(_categoryError!,
+                      style: const TextStyle(
+                          color: AppColors.danger, fontSize: 12)),
+                ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<Suburb>(
-                initialValue: _area,
-                isExpanded: true,
-                decoration: _decoration('Area'),
-                items: [
-                  for (final s in allSuburbs)
-                    DropdownMenuItem(value: s, child: Text(s.label)),
-                ],
-                onChanged: (v) => setState(() => _area = v),
-                validator: (v) => v == null ? 'Choose an area' : null,
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: _chooseArea,
+                child: InputDecorator(
+                  isEmpty: false,
+                  decoration: _decoration('Area').copyWith(
+                    errorText: _areaError,
+                    suffixIcon: const Icon(Icons.arrow_drop_down),
+                  ),
+                  child: Text(
+                    _isOther
+                        ? 'Other'
+                        : (_area?.label ?? 'Choose your town or suburb'),
+                    style: TextStyle(
+                      color: (_area == null && !_isOther)
+                          ? AppColors.textLight
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
               ),
+              if (_isOther) ...[
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _otherController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _decoration('Your town or village'),
+                  validator: (v) =>
+                      (_isOther && (v == null || v.trim().isEmpty))
+                          ? 'Enter your town or village'
+                          : null,
+                ),
+              ],
               const SizedBox(height: 16),
               TextFormField(
                 controller: _titleController,
@@ -303,8 +378,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   backgroundColor: AppColors.primaryBlue,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                onPressed: _submit,
-                child: const Text('Post to bulletin board'),
+                onPressed: _posting ? null : _submit,
+                child: _posting
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Post to bulletin board'),
               ),
             ],
           ),

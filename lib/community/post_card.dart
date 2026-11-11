@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_colors.dart';
 import 'community_data.dart';
+import '../messaging/messaging_rep.dart';
+import '../messaging/private_chat_screen.dart';
 import 'share_post_screen.dart';
 
 class UserAvatar extends StatelessWidget {
@@ -26,7 +29,7 @@ class UserAvatar extends StatelessWidget {
 }
 
 class CategoryTag extends StatelessWidget {
-  final PostCategory category;
+  final CrimeCategory category;
   const CategoryTag({super.key, required this.category});
 
   @override
@@ -37,12 +40,17 @@ class CategoryTag extends StatelessWidget {
         color: category.color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(
-        category.tagLabel,
-        style: TextStyle(
-          color: category.color,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 150),
+        child: Text(
+          category.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: category.color,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
@@ -53,6 +61,9 @@ class PostCard extends StatelessWidget {
   final Post post;
   final VoidCallback? onTap;
 
+  /// Tapping the comment icon (opens the post with the reply box ready).
+  final VoidCallback? onComment;
+
   /// false in the feed (body is cut after 3 lines), true on the detail screen.
   final bool expanded;
 
@@ -60,12 +71,14 @@ class PostCard extends StatelessWidget {
     super.key,
     required this.post,
     this.onTap,
+    this.onComment,
     this.expanded = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final area = communityRepo.suburbById(post.areaId);
+    final area =
+        post.areaId == null ? null : communityRepo.suburbById(post.areaId!);
 
     return Container(
       decoration: BoxDecoration(
@@ -172,23 +185,24 @@ class PostCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 const Divider(height: 1, color: AppColors.divider),
                 const SizedBox(height: 8),
-                // Footer: share, comments, area
+                // Footer: comment | message privately | share            area
                 Row(
                   children: [
-                    Builder(
-                      builder: (buttonContext) => InkWell(
+                    Tooltip(
+                      message: 'Comment',
+                      child: InkWell(
                         borderRadius: BorderRadius.circular(8),
-                        onTap: () => sharePost(buttonContext, post),
-                        child: const Padding(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                        onTap: onComment,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 4),
                           child: Row(
                             children: [
-                              Icon(Icons.share_outlined,
+                              const Icon(Icons.chat_bubble_outline,
                                   size: 20, color: AppColors.textSecondary),
-                              SizedBox(width: 6),
-                              Text('Share',
-                                  style: TextStyle(
+                              const SizedBox(width: 6),
+                              Text('${post.comments.length}',
+                                  style: const TextStyle(
                                       color: AppColors.textSecondary,
                                       fontSize: 13)),
                             ],
@@ -196,20 +210,59 @@ class PostCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    const Icon(Icons.chat_bubble_outline,
-                        size: 19, color: AppColors.textSecondary),
-                    const SizedBox(width: 6),
-                    Text('${post.comments.length}',
-                        style: const TextStyle(
-                            color: AppColors.textSecondary, fontSize: 13)),
+                    // Message the author privately (not shown on your own posts).
+                    if (post.author.id != communityRepo.currentUser.id) ...[
+                      const SizedBox(width: 12),
+                      Tooltip(
+                        message: 'Message privately',
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            if (!MessagingRepository.isAvailable) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Private messages need the database connection.'),
+                                ),
+                              );
+                              return;
+                            }
+                            openPrivateChat(context, post);
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.mail_outline,
+                                size: 20, color: AppColors.textSecondary),
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 12),
+                    Builder(
+                      builder: (buttonContext) => Tooltip(
+                        message: 'Share',
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () => sharePost(buttonContext, post),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.share_outlined,
+                                size: 20, color: AppColors.textSecondary),
+                          ),
+                        ),
+                      ),
+                    ),
                     const Spacer(),
                     const Icon(Icons.place_outlined,
                         size: 16, color: AppColors.textLight),
                     const SizedBox(width: 2),
-                    Text(area?.name ?? '',
-                        style: const TextStyle(
-                            color: AppColors.textLight, fontSize: 12)),
+                    Flexible(
+                      child: Text(area?.name ?? post.otherArea ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: AppColors.textLight, fontSize: 12)),
+                    ),
                   ],
                 ),
               ],
@@ -234,6 +287,40 @@ class AttachmentView extends StatelessWidget {
     this.onRemove,
   });
 
+  /// Local picture (just picked) or picture saved in Supabase Storage.
+  Widget _image({required BoxFit fit, double? width, double? height}) {
+    final bytes = attachment.bytes;
+    if (bytes != null) {
+      return Image.memory(bytes, width: width, height: height, fit: fit);
+    }
+    final url = attachment.url;
+    if (url != null) {
+      return Image.network(
+        url,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, _, _) => SizedBox(
+          width: width,
+          height: height ?? 120,
+          child: const Center(
+            child: Icon(Icons.broken_image_outlined,
+                color: AppColors.textLight, size: 32),
+          ),
+        ),
+        loadingBuilder: (context, child, progress) => progress == null
+            ? child
+            : SizedBox(
+                width: width,
+                height: height ?? 120,
+                child: const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
   void _zoom(BuildContext context) {
     showDialog<void>(
       context: context,
@@ -243,7 +330,7 @@ class AttachmentView extends StatelessWidget {
         child: Stack(
           children: [
             InteractiveViewer(
-              child: Center(child: Image.memory(attachment.bytes)),
+              child: Center(child: _image(fit: BoxFit.contain)),
             ),
             Positioned(
               top: 8,
@@ -277,11 +364,10 @@ class AttachmentView extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.memory(
-                attachment.bytes,
+              child: _image(
+                fit: BoxFit.cover,
                 width: double.infinity,
                 height: pictureHeight,
-                fit: BoxFit.cover,
               ),
             ),
             if (onRemove != null)
@@ -303,7 +389,13 @@ class AttachmentView extends StatelessWidget {
     }
 
     final isPdf = attachment.name.toLowerCase().endsWith('.pdf');
-    return Container(
+    final url = attachment.url;
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: url == null
+          ? null
+          : () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+      child: Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
       decoration: BoxDecoration(
         color: AppColors.softSurface,
@@ -341,6 +433,7 @@ class AttachmentView extends StatelessWidget {
           if (removeButton != null) removeButton else const SizedBox(width: 8),
         ],
       ),
+    ),
     );
   }
 }

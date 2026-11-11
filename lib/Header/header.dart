@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/spacing.dart';
+import '../theme/app_colors.dart';
+import '../theme/spacing.dart';
 
 /// The top bar shown on every main screen:
 /// app name on the left, bell and burger menu on the right.

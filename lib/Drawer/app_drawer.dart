@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/spacing.dart';
+import '../theme/app_colors.dart';
+import '../theme/spacing.dart';
 
 /// The slide-out menu opened by the burger icon in the Header.
 class AppDrawer extends StatelessWidget {

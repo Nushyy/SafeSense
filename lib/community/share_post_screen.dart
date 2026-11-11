@@ -1,4 +1,3 @@
-import 'package:file_selector/file_selector.dart' show XFile;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -6,13 +5,16 @@ import 'community_data.dart';
 
 /// The message people see in WhatsApp, Facebook, Instagram, SMS, email, etc.
 String buildShareText(Post post) {
-  final area = communityRepo.suburbById(post.areaId)?.label;
+  final area = post.areaId == null
+      ? post.otherArea
+      : communityRepo.suburbById(post.areaId!)?.label;
   return [
-    '${post.category.tagLabel.toUpperCase()}: ${post.title}',
+    '${post.category.name.toUpperCase()}: ${post.title}',
     '',
     post.body,
     '',
     if (area != null) 'Area: $area',
+    if (post.attachment?.url != null) 'Attachment: ${post.attachment!.url}',
     'Shared from SafeSense',
   ].join('\n');
 }
@@ -29,6 +31,7 @@ Future<void> sharePost(BuildContext context, Post post) async {
       (box != null && box.hasSize) ? box.localToGlobal(Offset.zero) & box.size : null;
   final text = buildShareText(post);
   final attachment = post.attachment;
+  final bytes = attachment?.bytes; // only set for files that are still local
 
   try {
     final result = await SharePlus.instance.share(
@@ -36,16 +39,17 @@ Future<void> sharePost(BuildContext context, Post post) async {
         text: text,
         subject: post.title,
         sharePositionOrigin: origin,
-        files: attachment == null
+        files: (attachment == null || bytes == null)
             ? null
             : [
                 XFile.fromData(
-                  attachment.bytes,
+                  bytes,
                   name: attachment.name,
                   mimeType: attachment.mimeType,
                 ),
               ],
-        fileNameOverrides: attachment == null ? null : [attachment.name],
+        fileNameOverrides:
+            (attachment == null || bytes == null) ? null : [attachment.name],
       ),
     );
     if (result.status == ShareResultStatus.unavailable) {
