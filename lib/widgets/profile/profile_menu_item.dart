@@ -20,6 +20,7 @@ class ProfileMenuItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final itemColor = isDanger ? colors.error : colors.onSurface;
+    
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       leading: Container(

@@ -1,124 +1,83 @@
+
 import 'package:dio/dio.dart';
 
 class SearchService {
   final Dio dio = Dio();
 
-  static const String _baseUrl = 'https://nominatim.openstreetmap.org';
-
-  /// Search for places using a name or address.
+  /// Search for places using OpenStreetMap Nominatim.
   Future<List<dynamic>> searchPlaces(String query) async {
     final response = await dio.get(
-      '$_baseUrl/search',
+      'https://nominatim.openstreetmap.org/search',
       queryParameters: {
         'q': query,
         'format': 'jsonv2',
         'addressdetails': 1,
         'limit': 5,
       },
-      options: Options(headers: {'User-Agent': 'SafeSenseApp'}),
+      options: Options(
+        headers: {
+          'User-Agent': 'SafeSenseApp',
+        },
+      ),
     );
 
-    return response.data;
+    return response.data as List<dynamic>;
   }
 
-  /// Convert GPS coordinates into a short, readable location.
-  ///
-  /// Preferred format:
-  /// Suburb, City
-  ///
-  /// Example:
-  /// Universitas, Bloemfontein
-  Future<String?> reverseGeocode(double latitude, double longitude) async {
+  /// Convert GPS coordinates into a readable place name.
+  Future<String> reverseGeocode(
+    double latitude,
+    double longitude,
+  ) async {
     try {
       final response = await dio.get(
-        '$_baseUrl/reverse',
+        'https://nominatim.openstreetmap.org/reverse',
         queryParameters: {
           'lat': latitude,
           'lon': longitude,
           'format': 'jsonv2',
+          'zoom': 14,
           'addressdetails': 1,
-          'zoom': 16,
         },
-        options: Options(headers: {'User-Agent': 'SafeSenseApp'}),
+        options: Options(
+          headers: {
+            'User-Agent': 'SafeSenseApp',
+          },
+        ),
       );
 
       final data = response.data;
 
-      if (data is! Map) {
-        return null;
-      }
+      if (data is Map<String, dynamic>) {
+        final address = data['address'];
 
-      final address = data['address'];
+        if (address is Map) {
+          for (final key in [
+            'suburb',
+            'neighbourhood',
+            'town',
+            'city',
+            'village',
+            'county',
+          ]) {
+            final value = address[key];
 
-      if (address is Map) {
-        final suburb = _firstAvailable(address, [
-          'suburb',
-          'neighbourhood',
-          'quarter',
-          'city_district',
-          'residential',
-        ]);
-
-        final city = _firstAvailable(address, [
-          'city',
-          'town',
-          'village',
-          'municipality',
-          'county',
-        ]);
-
-        if (suburb != null && city != null) {
-          if (suburb.toLowerCase() == city.toLowerCase()) {
-            return city;
+            if (value is String && value.isNotEmpty) {
+              return value;
+            }
           }
-
-          return '$suburb, $city';
         }
 
-        if (city != null) {
-          return city;
-        }
+        final displayName = data['display_name'];
 
-        if (suburb != null) {
-          return suburb;
+        if (displayName is String && displayName.isNotEmpty) {
+          return displayName;
         }
       }
-
-      // Fallback when structured address fields are missing.
-      final displayName = data['display_name'];
-
-      if (displayName is String && displayName.trim().isNotEmpty) {
-        final parts = displayName
-            .split(',')
-            .map((part) => part.trim())
-            .where((part) => part.isNotEmpty)
-            .toList();
-
-        if (parts.length >= 2) {
-          return '${parts[0]}, ${parts[1]}';
-        }
-
-        if (parts.isNotEmpty) {
-          return parts.first;
-        }
-      }
-
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// Returns the first valid address field.
-  String? _firstAvailable(Map address, List<String> keys) {
-    for (final key in keys) {
-      final value = address[key];
-
-      if (value is String && value.trim().isNotEmpty) {
-        return value.trim();
-      }
+    } catch (error) {
+      // Location lookup failure must not crash SafeSense.
     }
 
-    return null;
+    return 'Unknown location';
   }
 }

@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -29,6 +30,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _fullName = 'SafeSense User';
   String _username = '@user';
   String _town = 'Location not set';
+  String? _avatarPath;
 
   int _reportsCount = 0;
 
@@ -110,6 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _town = profile.neighborhood.trim().isNotEmpty
             ? profile.neighborhood.trim()
             : 'Location not set';
+            _avatarPath = profile.avatarPath;
       });
     } catch (error) {
       debugPrint('Could not load SafeSense profile: $error');
@@ -222,7 +225,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         return BottomNavScaffold(
           currentIndex: 4,
-          title: 'SafeSense',
+          title: 'Profile',
         child: RefreshIndicator(
           onRefresh: _refreshProfile,
           child: SingleChildScrollView(
@@ -231,20 +234,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Profile',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontSize: (theme.textTheme.titleLarge?.fontSize ?? 22) - 1,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
               _buildHeader(context),
               if (_loading) ...[
                 const SizedBox(height: 12),
@@ -425,17 +415,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         children: [
           Container(
+  width: 86,
+  height: 86,
+  decoration: BoxDecoration(
+    shape: BoxShape.circle,
+    color: Colors.white.withValues(alpha: 0.16),
+    border: Border.all(
+      color: Colors.white.withValues(alpha: 0.65),
+      width: 2,
+    ),
+  ),
+  child: ClipOval(
+    child: ProfileRepository.getAvatarUrl(_avatarPath) != null
+        ? Image.network(
+            ProfileRepository.getAvatarUrl(_avatarPath)!,
             width: 86,
             height: 86,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.16),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.65),
-                width: 2,
-              ),
-            ),
-            child: Center(
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Center(
               child: Text(
                 _initials,
                 style: const TextStyle(
@@ -445,17 +442,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            _fullName,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 23,
-              fontWeight: FontWeight.w800,
+          )
+        : Center(
+            child: Text(
+              _initials,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
+  ),
+),
           const SizedBox(height: 4),
           Text(
             _username,

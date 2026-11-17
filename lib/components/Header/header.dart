@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import '../../theme/colors.dart';
@@ -53,19 +52,8 @@ class Header extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
 
+      // Menu button only. Notification bell removed.
       actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined),
-          color: AppColors.navy,
-          tooltip: 'Notifications',
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Notifications are not available yet.'),
-              ),
-            );
-          },
-        ),
         Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),

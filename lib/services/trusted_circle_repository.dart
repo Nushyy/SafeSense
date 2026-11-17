@@ -1,3 +1,4 @@
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TrustedProfileMatch {
@@ -5,17 +6,20 @@ class TrustedProfileMatch {
     required this.id,
     required this.username,
     required this.fullName,
+    this.avatarPath,
   });
 
   final String id;
   final String username;
   final String fullName;
+  final String? avatarPath;
 
   factory TrustedProfileMatch.fromMap(Map<String, dynamic> map) {
     return TrustedProfileMatch(
       id: map['id'].toString(),
       username: (map['username'] ?? '').toString(),
       fullName: (map['full_name'] ?? '').toString(),
+      avatarPath: map['avatar_path']?.toString(),
     );
   }
 
@@ -31,6 +35,7 @@ class TrustedCircleEntry {
     required this.fullName,
     required this.status,
     required this.direction,
+    this.avatarPath,
   });
 
   final String requestId;
@@ -39,6 +44,7 @@ class TrustedCircleEntry {
   final String fullName;
   final String status;
   final String direction;
+  final String? avatarPath;
 
   factory TrustedCircleEntry.fromMap(Map<String, dynamic> map) {
     return TrustedCircleEntry(
@@ -48,13 +54,15 @@ class TrustedCircleEntry {
       fullName: (map['full_name'] ?? 'SafeSense user').toString(),
       status: (map['status'] ?? '').toString().toLowerCase(),
       direction: (map['direction'] ?? '').toString().toLowerCase(),
+      avatarPath: map['avatar_path']?.toString(),
     );
   }
 
   String get displayUsername =>
       username.startsWith('@') ? username : '@$username';
 
-  String get displayName => fullName.trim().isEmpty ? displayUsername : fullName;
+  String get displayName =>
+      fullName.trim().isEmpty ? displayUsername : fullName;
 }
 
 class TrustedCircleRepository {
@@ -72,18 +80,26 @@ class TrustedCircleRepository {
 
   static Future<TrustedProfileMatch?> searchUsername(String username) async {
     _requireSignedIn();
+
     final clean = username.trim().replaceFirst(RegExp(r'^@'), '');
-    if (clean.isEmpty) throw ArgumentError('Enter a username to search.');
+
+    if (clean.isEmpty) {
+      throw ArgumentError('Enter a username to search.');
+    }
 
     final result = await _client.rpc(
       'find_profile_by_username',
       params: {'p_username': clean},
     );
+
     final rows = result is List ? result : <dynamic>[];
+
     if (rows.isEmpty) return null;
+
     if (rows.length > 1) {
       throw StateError(
-        'More than one SafeSense account uses that username. The database usernames need to be corrected before a request can be sent.',
+        'More than one SafeSense account uses that username. '
+        'The database usernames need to be corrected before a request can be sent.',
       );
     }
 
@@ -94,8 +110,12 @@ class TrustedCircleRepository {
 
   static Future<void> sendRequest(String username) async {
     _requireSignedIn();
+
     final clean = username.trim().replaceFirst(RegExp(r'^@'), '');
-    if (clean.isEmpty) throw ArgumentError('Search for a username first.');
+
+    if (clean.isEmpty) {
+      throw ArgumentError('Search for a username first.');
+    }
 
     await _client.rpc(
       'create_trusted_circle_request',
@@ -105,14 +125,18 @@ class TrustedCircleRepository {
 
   static Future<List<TrustedCircleEntry>> loadEntries() async {
     _requireSignedIn();
+
     final result = await _client.rpc('get_my_trusted_circle');
+
     if (result is! List) return <TrustedCircleEntry>[];
 
     return result
         .whereType<Map>()
-        .map((row) => TrustedCircleEntry.fromMap(
-              Map<String, dynamic>.from(row),
-            ))
+        .map(
+          (row) => TrustedCircleEntry.fromMap(
+            Map<String, dynamic>.from(row),
+          ),
+        )
         .toList();
   }
 
@@ -121,6 +145,7 @@ class TrustedCircleRepository {
     required bool accept,
   }) async {
     _requireSignedIn();
+
     await _client.rpc(
       'respond_to_trusted_circle_request',
       params: {
@@ -132,6 +157,7 @@ class TrustedCircleRepository {
 
   static Future<void> remove(String requestId) async {
     _requireSignedIn();
+
     await _client.rpc(
       'remove_trusted_circle_member',
       params: {'p_request_id': requestId},

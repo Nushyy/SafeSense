@@ -7,6 +7,12 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'services/sos/sos_shake_listener.dart';
 
+// SAPS Dashboard services
+import 'services/saps/saps_auth_service.dart';
+import 'services/saps/saps_case_service.dart';
+import 'services/saps/saps_mock_backend.dart';
+import 'services/saps/saps_supabase_auth.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -44,6 +50,16 @@ Future<void> main() async {
     url: supabaseUrl,
     publishableKey: supabasePublishableKey,
   );
+
+  // Initialize the SAPS demonstration services.
+  //
+  // These services use mock authentication and mock cases.
+  // They do not retrieve real citizen reports from Supabase.
+  //
+  // Replace these implementations with verified Supabase
+  // services before enabling real SAPS case management.
+  SapsAuthService.instance = SupabaseSapsAuth();
+  SapsCaseService.instance = MockSapsCases();
 
   // Start SafeSense.
   runApp(const MyApp());

@@ -5,8 +5,7 @@
     "ignore": [
       "firebase.json",
       "**/node_modules/**",
-      ".last_build_id",
-      "assets/.env"
+      ".last_build_id"
     ],
     "rewrites": [
       {
