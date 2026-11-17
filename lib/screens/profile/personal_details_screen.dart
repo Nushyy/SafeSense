@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 
 import '../../services/profile_repository.dart';
@@ -7,7 +8,8 @@ class PersonalDetailsScreen extends StatefulWidget {
   const PersonalDetailsScreen({super.key});
 
   @override
-  State<PersonalDetailsScreen> createState() => _PersonalDetailsScreenState();
+  State<PersonalDetailsScreen> createState() =>
+      _PersonalDetailsScreenState();
 }
 
 class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
@@ -24,7 +26,9 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
   Future<void> _load() async {
     try {
       final profile = await ProfileRepository.loadCurrentProfile();
+
       if (!mounted) return;
+
       setState(() {
         _profile = profile;
         _error = null;
@@ -32,6 +36,7 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
       });
     } catch (error) {
       if (!mounted) return;
+
       setState(() {
         _error = error.toString().replaceFirst('Bad state: ', '');
         _loading = false;
@@ -42,9 +47,50 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
   Future<void> _edit() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+      MaterialPageRoute(
+        builder: (_) => const EditProfileScreen(),
+      ),
     );
+
     await _load();
+  }
+
+  Widget _buildAvatar(ProfileRecord profile, ColorScheme colors) {
+    final avatarUrl = ProfileRepository.getAvatarUrl(profile.avatarPath);
+
+    return CircleAvatar(
+      radius: 29,
+      backgroundColor: colors.primaryContainer,
+      child: ClipOval(
+        child: avatarUrl != null
+            ? Image.network(
+                avatarUrl,
+                width: 58,
+                height: 58,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Center(
+                  child: Text(
+                    profile.initials,
+                    style: TextStyle(
+                      color: colors.onPrimaryContainer,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 19,
+                    ),
+                  ),
+                ),
+              )
+            : Center(
+                child: Text(
+                  profile.initials,
+                  style: TextStyle(
+                    color: colors.onPrimaryContainer,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 19,
+                  ),
+                ),
+              ),
+      ),
+    );
   }
 
   @override
@@ -54,13 +100,18 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
     final profile = _profile;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Personal Details')),
+      appBar: AppBar(
+        title: const Text('Personal Details'),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _messageState(_error!, onRetry: _load)
               : profile == null
-                  ? _messageState('Your profile details are not available.', onRetry: _load)
+                  ? _messageState(
+                      'Your profile details are not available.',
+                      onRetry: _load,
+                    )
                   : ListView(
                       padding: const EdgeInsets.all(20),
                       children: [
@@ -69,39 +120,33 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
                           decoration: BoxDecoration(
                             color: colors.surface,
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: colors.outlineVariant),
+                            border: Border.all(
+                              color: colors.outlineVariant,
+                            ),
                           ),
                           child: Row(
                             children: [
-                              CircleAvatar(
-                                radius: 29,
-                                backgroundColor: colors.primaryContainer,
-                                child: Text(
-                                  profile.initials,
-                                  style: TextStyle(
-                                    color: colors.onPrimaryContainer,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 19,
-                                  ),
-                                ),
-                              ),
+                              _buildAvatar(profile, colors),
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       profile.fullName.isEmpty
                                           ? 'Name not set'
                                           : profile.fullName,
-                                      style: theme.textTheme.titleMedium?.copyWith(
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       profile.displayUsername,
-                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
                                         color: colors.onSurfaceVariant,
                                       ),
                                     ),
@@ -113,23 +158,52 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
                         ),
                         const SizedBox(height: 18),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 18),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                          ),
                           decoration: BoxDecoration(
                             color: colors.surface,
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: colors.outlineVariant),
+                            border: Border.all(
+                              color: colors.outlineVariant,
+                            ),
                           ),
                           child: Column(
                             children: [
-                              _detailRow(context, 'Full name', profile.fullName, Icons.person_outline),
+                              _detailRow(
+                                context,
+                                'Full name',
+                                profile.fullName,
+                                Icons.person_outline,
+                              ),
                               _divider(context),
-                              _detailRow(context, 'Username', profile.displayUsername, Icons.alternate_email),
+                              _detailRow(
+                                context,
+                                'Username',
+                                profile.displayUsername,
+                                Icons.alternate_email,
+                              ),
                               _divider(context),
-                              _detailRow(context, 'Phone number', _orNotSet(profile.phoneNumber), Icons.phone_outlined),
+                              _detailRow(
+                                context,
+                                'Phone number',
+                                _orNotSet(profile.phoneNumber),
+                                Icons.phone_outlined,
+                              ),
                               _divider(context),
-                              _detailRow(context, 'Email address', _orNotSet(profile.email), Icons.email_outlined),
+                              _detailRow(
+                                context,
+                                'Email address',
+                                _orNotSet(profile.email),
+                                Icons.email_outlined,
+                              ),
                               _divider(context),
-                              _detailRow(context, 'Town / neighbourhood', _orNotSet(profile.neighborhood), Icons.location_on_outlined),
+                              _detailRow(
+                                context,
+                                'Town / neighbourhood',
+                                _orNotSet(profile.neighborhood),
+                                Icons.location_on_outlined,
+                              ),
                             ],
                           ),
                         ),
@@ -156,17 +230,26 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
     );
   }
 
-  String _orNotSet(String value) => value.trim().isEmpty ? 'Not set' : value;
+  String _orNotSet(String value) =>
+      value.trim().isEmpty ? 'Not set' : value;
 
-  Widget _messageState(String message, {required VoidCallback onRetry}) {
+  Widget _messageState(
+    String message, {
+    required VoidCallback onRetry,
+  }) {
     final colors = Theme.of(context).colorScheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.info_outline, size: 42, color: colors.onSurfaceVariant),
+            Icon(
+              Icons.info_outline,
+              size: 42,
+              color: colors.onSurfaceVariant,
+            ),
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
@@ -181,8 +264,14 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
     );
   }
 
-  Widget _detailRow(BuildContext context, String label, String value, IconData icon) {
+  Widget _detailRow(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+  ) {
     final colors = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 15),
       child: Row(

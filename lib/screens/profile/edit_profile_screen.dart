@@ -1,4 +1,6 @@
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../services/profile_repository.dart';
 
@@ -16,8 +18,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _phoneController = TextEditingController();
   final _neighborhoodController = TextEditingController();
 
+  final ImagePicker _imagePicker = ImagePicker();
+
+  ProfileRecord? _profile;
+
   bool _loading = true;
   bool _saving = false;
+  bool _uploadingPicture = false;
+  bool _removingPicture = false;
+
   String? _loadError;
 
   @override
@@ -38,8 +47,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _loadProfile() async {
     try {
       final profile = await ProfileRepository.loadCurrentProfile();
+
       if (!mounted) return;
 
+      _profile = profile;
       _fullNameController.text = profile.fullName;
       _usernameController.text = profile.username;
       _phoneController.text = profile.phoneNumber;
@@ -51,6 +62,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       });
     } catch (error) {
       if (!mounted) return;
+
       setState(() {
         _loading = false;
         _loadError = error.toString().replaceFirst('Bad state: ', '');
@@ -58,11 +70,142 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _pickAndUploadPicture() async {
+    if (_uploadingPicture || _removingPicture) return;
+
+    try {
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1600,
+        maxHeight: 1600,
+      );
+
+      if (pickedFile == null) return;
+
+      final imageBytes = await pickedFile.readAsBytes();
+
+      if (imageBytes.length > 5 * 1024 * 1024) {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select an image smaller than 5 MB.'),
+          ),
+        );
+        return;
+      }
+
+      final extensionIndex = pickedFile.name.lastIndexOf('.');
+
+      if (extensionIndex == -1) {
+        throw Exception('The selected image has an unsupported file format.');
+      }
+
+      final extension = pickedFile.name
+          .substring(extensionIndex + 1)
+          .toLowerCase();
+
+      setState(() => _uploadingPicture = true);
+
+      final updatedProfile = await ProfileRepository.uploadProfilePicture(
+        imageBytes: imageBytes,
+        fileExtension: extension,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _profile = updatedProfile;
+        _uploadingPicture = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile picture updated successfully.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() => _uploadingPicture = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _removePicture() async {
+    if (_uploadingPicture || _removingPicture) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Remove profile picture?'),
+        content: const Text(
+          'Your profile picture will be removed and your initials '
+          'will be displayed instead.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _removingPicture = true);
+
+    try {
+      final updatedProfile =
+          await ProfileRepository.removeProfilePicture();
+
+      if (!mounted) return;
+
+      setState(() {
+        _profile = updatedProfile;
+        _removingPicture = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile picture removed.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() => _removingPicture = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
+
     try {
       await ProfileRepository.saveCurrentProfile(
         fullName: _fullNameController.text,
@@ -72,22 +215,105 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated successfully.')),
+        const SnackBar(
+          content: Text('Profile updated successfully.'),
+        ),
       );
+
       Navigator.pop(context, true);
     } catch (error) {
       if (!mounted) return;
+
       final message = error.toString()
           .replaceFirst('Exception: ', '')
           .replaceFirst('Bad state: ', '')
           .replaceFirst('Invalid argument(s): ', '');
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Widget _buildProfilePicture(ThemeData theme) {
+    final colors = theme.colorScheme;
+    final profile = _profile;
+
+    final avatarUrl = ProfileRepository.getAvatarUrl(
+      profile?.avatarPath,
+    );
+
+    final busy = _uploadingPicture || _removingPicture;
+
+    return Column(
+      children: [
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            CircleAvatar(
+              radius: 43,
+              backgroundColor: colors.primaryContainer,
+              backgroundImage: avatarUrl != null
+                  ? NetworkImage(avatarUrl)
+                  : null,
+              child: avatarUrl == null
+                  ? Text(
+                      profile?.initials ?? 'S',
+                      style: TextStyle(
+                        color: colors.onPrimaryContainer,
+                        fontSize: 25,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : null,
+            ),
+            if (busy)
+              Container(
+                width: 86,
+                height: 86,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 3,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: busy ? null : _pickAndUploadPicture,
+              icon: const Icon(Icons.camera_alt_outlined, size: 18),
+              label: Text(
+                avatarUrl == null ? 'Add photo' : 'Change photo',
+              ),
+            ),
+            if (avatarUrl != null)
+              TextButton.icon(
+                onPressed: busy ? null : _removePicture,
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Remove'),
+                style: TextButton.styleFrom(
+                  foregroundColor: colors.error,
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
   }
 
   @override
@@ -108,7 +334,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       children: [
                         const Icon(Icons.cloud_off_outlined, size: 42),
                         const SizedBox(height: 12),
-                        Text(_loadError!, textAlign: TextAlign.center),
+                        Text(
+                          _loadError!,
+                          textAlign: TextAlign.center,
+                        ),
                         const SizedBox(height: 16),
                         OutlinedButton.icon(
                           onPressed: () {
@@ -135,38 +364,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         decoration: BoxDecoration(
                           color: colors.surface,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: colors.outlineVariant),
+                          border: Border.all(
+                            color: colors.outlineVariant,
+                          ),
                         ),
-                        child: Row(
+                        child: Column(
                           children: [
-                            CircleAvatar(
-                              radius: 30,
-                              backgroundColor: colors.primaryContainer,
-                              child: Icon(
-                                Icons.person_outline,
-                                color: colors.onPrimaryContainer,
-                                size: 30,
+                            _buildProfilePicture(theme),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Your account details',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Your account details',
-                                    style: theme.textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Changes are saved to your SafeSense profile.',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: colors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
+                            const SizedBox(height: 4),
+                            Text(
+                              'Manage your profile picture and account information.',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -180,9 +397,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           labelText: 'Full name',
                           prefixIcon: Icon(Icons.person_outline),
                         ),
-                        validator: (value) => value == null || value.trim().isEmpty
-                            ? 'Enter your full name.'
-                            : null,
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? 'Enter your full name.'
+                                : null,
                       ),
                       const SizedBox(height: 14),
                       TextFormField(
@@ -191,17 +409,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Username',
                           prefixIcon: Icon(Icons.alternate_email),
-                          helperText: '3–30 letters, numbers, underscores or periods.',
+                          helperText:
+                              '3–30 letters, numbers, underscores or periods.',
                         ),
                         validator: (value) {
                           final username = (value ?? '').trim().replaceFirst(
                                 RegExp(r'^@'),
                                 '',
                               );
+
                           if (!RegExp(r'^[a-zA-Z0-9_.]{3,30}$')
                               .hasMatch(username)) {
                             return 'Enter a valid username (3–30 characters).';
                           }
+
                           return null;
                         },
                       ),
@@ -238,7 +459,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   ),
                                 )
                               : const Icon(Icons.save_outlined),
-                          label: Text(_saving ? 'Saving…' : 'Save changes'),
+                          label: Text(
+                            _saving ? 'Saving…' : 'Save changes',
+                          ),
                         ),
                       ),
                     ],

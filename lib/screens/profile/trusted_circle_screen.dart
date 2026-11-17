@@ -1,13 +1,16 @@
+
 import 'package:flutter/material.dart';
 
 import '../../services/trusted_circle_repository.dart';
+import '../../services/profile_repository.dart';
 import 'add_trusted_user_screen.dart';
 
 class TrustedCircleScreen extends StatefulWidget {
   const TrustedCircleScreen({super.key});
 
   @override
-  State<TrustedCircleScreen> createState() => _TrustedCircleScreenState();
+  State<TrustedCircleScreen> createState() =>
+      _TrustedCircleScreenState();
 }
 
 class _TrustedCircleScreenState extends State<TrustedCircleScreen>
@@ -21,13 +24,15 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
   List<TrustedCircleEntry> get _friends =>
       _entries.where((entry) => entry.status == 'accepted').toList();
 
-  List<TrustedCircleEntry> get _incoming =>
-      _entries.where((entry) =>
-          entry.status == 'pending' && entry.direction == 'incoming').toList();
+  List<TrustedCircleEntry> get _incoming => _entries
+      .where((entry) =>
+          entry.status == 'pending' && entry.direction == 'incoming')
+      .toList();
 
-  List<TrustedCircleEntry> get _outgoing =>
-      _entries.where((entry) =>
-          entry.status == 'pending' && entry.direction == 'outgoing').toList();
+  List<TrustedCircleEntry> get _outgoing => _entries
+      .where((entry) =>
+          entry.status == 'pending' && entry.direction == 'outgoing')
+      .toList();
 
   int get _pendingCount => _incoming.length + _outgoing.length;
 
@@ -49,12 +54,16 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
       _loading = true;
       _error = null;
     });
+
     try {
       final entries = await TrustedCircleRepository.loadEntries();
+
       if (!mounted) return;
+
       setState(() => _entries = entries);
     } catch (error) {
       if (!mounted) return;
+
       setState(() {
         _error = error.toString()
             .replaceFirst('Bad state: ', '')
@@ -68,19 +77,28 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
   Future<void> _addPerson() async {
     await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => const AddTrustedUserScreen()),
+      MaterialPageRoute(
+        builder: (_) => const AddTrustedUserScreen(),
+      ),
     );
+
     if (mounted) await _load();
   }
 
-  Future<void> _respond(TrustedCircleEntry entry, bool accept) async {
+  Future<void> _respond(
+    TrustedCircleEntry entry,
+    bool accept,
+  ) async {
     setState(() => _busyRequests.add(entry.requestId));
+
     try {
       await TrustedCircleRepository.respond(
         requestId: entry.requestId,
         accept: accept,
       );
+
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -90,12 +108,15 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
           ),
         ),
       );
+
       await _load();
     } catch (error) {
       if (!mounted) return;
       _showError(error);
     } finally {
-      if (mounted) setState(() => _busyRequests.remove(entry.requestId));
+      if (mounted) {
+        setState(() => _busyRequests.remove(entry.requestId));
+      }
     }
   }
 
@@ -105,7 +126,8 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
       builder: (dialogContext) => AlertDialog(
         title: const Text('Remove trusted person?'),
         content: Text(
-          'Remove ${entry.displayName} from your Trusted Circle? They will no longer appear as an accepted trusted person.',
+          'Remove ${entry.displayName} from your Trusted Circle? '
+          'They will no longer appear as an accepted trusted person.',
         ),
         actions: [
           TextButton(
@@ -119,16 +141,20 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
         ],
       ),
     );
+
     if (confirmed != true) return;
 
     setState(() => _busyRequests.add(entry.requestId));
+
     try {
       await TrustedCircleRepository.remove(entry.requestId);
       await _load();
     } catch (error) {
       if (mounted) _showError(error);
     } finally {
-      if (mounted) setState(() => _busyRequests.remove(entry.requestId));
+      if (mounted) {
+        setState(() => _busyRequests.remove(entry.requestId));
+      }
     }
   }
 
@@ -136,8 +162,63 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
     final message = error.toString()
         .replaceFirst('Exception: ', '')
         .replaceFirst('Bad state: ', '');
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
+    );
+  }
+
+  String _initials(String name) {
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+
+    if (parts.isEmpty) return 'S';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
+
+  Widget _buildAvatar(
+    TrustedCircleEntry entry, {
+    double radius = 20,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    final avatarUrl =
+        ProfileRepository.getAvatarUrl(entry.avatarPath);
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: colors.primaryContainer,
+      child: ClipOval(
+        child: avatarUrl != null
+            ? Image.network(
+                avatarUrl,
+                width: radius * 2,
+                height: radius * 2,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    _fallbackAvatar(entry.displayName, radius),
+              )
+            : _fallbackAvatar(entry.displayName, radius),
+      ),
+    );
+  }
+
+  Widget _fallbackAvatar(String name, double radius) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Text(
+        _initials(name),
+        style: TextStyle(
+          color: colors.onPrimaryContainer,
+          fontWeight: FontWeight.w700,
+          fontSize: radius * 0.65,
+        ),
+      ),
     );
   }
 
@@ -147,7 +228,9 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
     final colors = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Trusted Circle')),
+      appBar: AppBar(
+        title: const Text('Trusted Circle'),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addPerson,
         icon: const Icon(Icons.person_add_alt_1),
@@ -200,7 +283,8 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${_friends.length} trusted ${_friends.length == 1 ? 'person' : 'people'}',
+                        '${_friends.length} trusted '
+                        '${_friends.length == 1 ? 'person' : 'people'}',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.88),
                           fontSize: 14,
@@ -265,7 +349,8 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
       return _emptyState(
         icon: Icons.people_outline,
         title: 'No trusted people yet',
-        message: 'Search for an existing SafeSense username to invite someone.',
+        message:
+            'Search for an existing SafeSense username to invite someone.',
       );
     }
 
@@ -274,26 +359,21 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
         itemCount: _friends.length,
-        separatorBuilder: (_, index) => const SizedBox(height: 12),
+        separatorBuilder: (_, index) =>
+            const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final entry = _friends[index];
           final colors = Theme.of(context).colorScheme;
+
           return Card(
             child: ListTile(
               contentPadding: const EdgeInsets.all(12),
-              leading: CircleAvatar(
-                backgroundColor: colors.primaryContainer,
-                child: Text(
-                  _initials(entry.displayName),
-                  style: TextStyle(
-                    color: colors.onPrimaryContainer,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
+              leading: _buildAvatar(entry, radius: 22),
               title: Text(
                 entry.displayName,
-                style: const TextStyle(fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               subtitle: Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -303,7 +383,9 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
                   ? const SizedBox(
                       width: 22,
                       height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
                     )
                   : PopupMenuButton<String>(
                       onSelected: (value) {
@@ -328,7 +410,8 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
       return _emptyState(
         icon: Icons.mark_email_read_outlined,
         title: 'No pending requests',
-        message: 'Incoming and sent Trusted Circle requests will appear here.',
+        message:
+            'Incoming and sent Trusted Circle requests will appear here.',
       );
     }
 
@@ -340,38 +423,37 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
           if (_incoming.isNotEmpty) ...[
             _sectionTitle('Incoming requests', _incoming.length),
             const SizedBox(height: 10),
-            ..._incoming.map((entry) => _requestCard(entry, incoming: true)),
+            ..._incoming.map(
+              (entry) => _requestCard(entry, incoming: true),
+            ),
           ],
           if (_outgoing.isNotEmpty) ...[
             const SizedBox(height: 16),
             _sectionTitle('Sent requests', _outgoing.length),
             const SizedBox(height: 10),
-            ..._outgoing.map((entry) => _requestCard(entry, incoming: false)),
+            ..._outgoing.map(
+              (entry) => _requestCard(entry, incoming: false),
+            ),
           ],
         ],
       ),
     );
   }
 
-  Widget _requestCard(TrustedCircleEntry entry, {required bool incoming}) {
+  Widget _requestCard(
+    TrustedCircleEntry entry, {
+    required bool incoming,
+  }) {
     final colors = Theme.of(context).colorScheme;
     final busy = _busyRequests.contains(entry.requestId);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
-            CircleAvatar(
-              backgroundColor: colors.primaryContainer,
-              child: Text(
-                _initials(entry.displayName),
-                style: TextStyle(
-                  color: colors.onPrimaryContainer,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
+            _buildAvatar(entry, radius: 22),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -379,17 +461,27 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
                 children: [
                   Text(
                     entry.displayName,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     entry.displayUsername,
-                    style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    incoming ? 'Wants to join your Trusted Circle' : 'Waiting for their response',
-                    style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+                    incoming
+                        ? 'Wants to join your Trusted Circle'
+                        : 'Waiting for their response',
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -398,7 +490,9 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
               const SizedBox(
                 width: 22,
                 height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                ),
               )
             else if (incoming)
               Column(
@@ -407,17 +501,26 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
                   IconButton(
                     tooltip: 'Accept request',
                     onPressed: () => _respond(entry, true),
-                    icon: Icon(Icons.check_circle, color: colors.primary),
+                    icon: Icon(
+                      Icons.check_circle,
+                      color: colors.primary,
+                    ),
                   ),
                   IconButton(
                     tooltip: 'Decline request',
                     onPressed: () => _respond(entry, false),
-                    icon: Icon(Icons.cancel_outlined, color: colors.error),
+                    icon: Icon(
+                      Icons.cancel_outlined,
+                      color: colors.error,
+                    ),
                   ),
                 ],
               )
             else
-              Icon(Icons.hourglass_top, color: colors.onSurfaceVariant),
+              Icon(
+                Icons.hourglass_top,
+                color: colors.onSurfaceVariant,
+              ),
           ],
         ),
       ),
@@ -426,6 +529,7 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
 
   Widget _sectionTitle(String title, int count) {
     final colors = Theme.of(context).colorScheme;
+
     return Row(
       children: [
         Expanded(
@@ -447,13 +551,18 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
 
   Widget _errorState() {
     final colors = Theme.of(context).colorScheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.cloud_off_outlined, size: 46, color: colors.error),
+            Icon(
+              Icons.cloud_off_outlined,
+              size: 46,
+              color: colors.error,
+            ),
             const SizedBox(height: 12),
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 16),
@@ -475,13 +584,18 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
     required String message,
   }) {
     final colors = Theme.of(context).colorScheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 58, color: colors.onSurfaceVariant),
+            Icon(
+              icon,
+              size: 58,
+              color: colors.onSurfaceVariant,
+            ),
             const SizedBox(height: 16),
             Text(
               title,
@@ -503,13 +617,5 @@ class _TrustedCircleScreenState extends State<TrustedCircleScreen>
         ),
       ),
     );
-  }
-
-  String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty).toList();
-    if (parts.isEmpty) return 'S';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 }

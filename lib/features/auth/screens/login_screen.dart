@@ -32,17 +32,132 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final response =
-          await Supabase.instance.client.auth.signInWithPassword(
+      final supabase = Supabase.instance.client;
+
+      // STEP 1: Authenticate the user with Supabase.
+      final response = await supabase.auth.signInWithPassword(
         email: email,
         password: password,
       );
 
+      final user = response.user;
+
+      if (user == null) {
+        throw Exception(
+          'Unable to identify the authenticated user.',
+        );
+      }
+
+      // STEP 2: Verify Administrator privileges.
+      final isAdmin =
+          await supabase.rpc('is_safesense_admin') == true;
+
       if (!mounted) return;
 
-      if (response.user != null) {
-        context.go('/home');
+      // STEP 3: Administrator login.
+      if (isAdmin) {
+        debugPrint(
+          'SafeSense: Administrator login confirmed.',
+        );
+
+        // Test Administrator access to pending Citizen profiles.
+        final pendingCitizens = await supabase
+            .from('profiles')
+            .select(
+              'id, username, full_name, approval_status',
+            )
+            .eq('role_id', 1)
+            .eq('approval_status', 'pending');
+
+        debugPrint(
+          'SafeSense: Pending Citizens found: '
+          '${pendingCitizens.length}',
+        );
+
+        if (!mounted) return;
+
+        // Navigate to the Administrator Dashboard.
+        context.go('/admin');
+        return;
       }
+
+      // STEP 4: Retrieve the user's profile.
+      final profile = await supabase
+          .from('profiles')
+          .select('role_id, approval_status')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (!mounted) return;
+
+      // Restrict accounts without a profile.
+      if (profile == null) {
+        debugPrint(
+          'SafeSense: User profile not found.',
+        );
+
+        context.go('/account-status');
+        return;
+      }
+
+      final roleId = profile['role_id'] as int?;
+      final approvalStatus =
+          profile['approval_status'] as String?;
+
+      // STEP 5: Restrict pending and rejected accounts.
+      if (approvalStatus != 'approved') {
+        debugPrint(
+          'SafeSense: Account approval required.',
+        );
+
+        context.go('/account-status');
+        return;
+      }
+
+      // STEP 6: Approved Citizen login.
+      if (roleId == 1) {
+        debugPrint(
+          'SafeSense: Approved Citizen login.',
+        );
+
+        context.go('/home');
+        return;
+      }
+
+      // STEP 7: SAPS Official login.
+      if (roleId == 6) {
+        final officer = await supabase
+            .from('saps_officers')
+            .select('verification_status')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        if (!mounted) return;
+
+        if (officer != null &&
+            officer['verification_status'] == 'verified') {
+          debugPrint(
+            'SafeSense: Verified SAPS Official login.',
+          );
+
+          context.go('/saps');
+        } else {
+          debugPrint(
+            'SafeSense: SAPS verification required.',
+          );
+
+          context.go('/account-status');
+        }
+
+        return;
+      }
+
+      // STEP 8: Restrict all other roles.
+      debugPrint(
+        'SafeSense: No authorized dashboard for this role.',
+      );
+
+      context.go('/account-status');
     } on AuthException catch (error) {
       if (!mounted) return;
 
@@ -51,7 +166,26 @@ class _LoginScreenState extends State<LoginScreen> {
           content: Text(error.message),
         ),
       );
-    } catch (_) {
+    } on PostgrestException catch (error) {
+      debugPrint(
+        'SafeSense database error: ${error.message}',
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to verify your account permissions. '
+            'Please try again.',
+          ),
+        ),
+      );
+    } catch (error) {
+      debugPrint(
+        'SafeSense login error: $error',
+      );
+
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,7 +262,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     hintText: 'Enter your email address',
-                    prefixIcon: Icon(Icons.email_outlined),
+                    prefixIcon: Icon(
+                      Icons.email_outlined,
+                    ),
                     border: OutlineInputBorder(),
                   ),
                   validator: (value) {
@@ -166,7 +302,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     prefixIcon: const Icon(
                       Icons.lock_outline,
                     ),
-                    border: const OutlineInputBorder(),
+                    border: OutlineInputBorder(),
                     suffixIcon: IconButton(
                       tooltip: _obscurePassword
                           ? 'Show password'
@@ -237,7 +373,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: _isLoading
                       ? null
                       : () => context.push('/register'),
-                  child: const Text('Create an account'),
+                  child: const Text(
+                    'Create an account',
+                  ),
                 ),
               ],
             ),

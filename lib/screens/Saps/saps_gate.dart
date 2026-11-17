@@ -1,17 +1,12 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../services/saps/saps_auth_service.dart';
 import 'saps_case_desk_screen.dart';
 import 'saps_colors.dart';
-import 'saps_login_screen.dart';
 import 'widgets/idle_guard.dart';
 
-enum _Stage { checking, login, desk }
-
-/// Decides what to show: login or case desk. The desk is only built after
-/// the officer check passes (and, if set up, the verification code).
 class SapsGate extends StatefulWidget {
   const SapsGate({super.key});
 
@@ -20,59 +15,87 @@ class SapsGate extends StatefulWidget {
 }
 
 class _SapsGateState extends State<SapsGate> {
-  _Stage _stage = _Stage.checking;
-  String? _notice;
-  StreamSubscription<void>? _sub;
+  bool _checking = true;
+  bool _authorised = false;
+  bool _signingOut = false;
 
   @override
   void initState() {
     super.initState();
-    _check();
-    _sub = SapsAuthService.instance.signedOut.listen((_) {
-      if (mounted) setState(() => _stage = _Stage.login);
+    _checkAccess();
+  }
+
+  Future<void> _checkAccess() async {
+    final authorised =
+        await SapsAuthService.instance.isFullyAuthorised();
+
+    if (!mounted) return;
+
+    if (!authorised) {
+      context.go('/account-status');
+      return;
+    }
+
+    setState(() {
+      _authorised = true;
+      _checking = false;
     });
   }
 
-  @override
-  void dispose() {
-    _sub?.cancel();
-    super.dispose();
-  }
+  Future<void> _signOut() async {
+    if (_signingOut) return;
 
-  Future<void> _check() async {
-    final ok = await SapsAuthService.instance.isFullyAuthorised();
-    if (!mounted) return;
-    setState(() => _stage = ok ? _Stage.desk : _Stage.login);
-  }
+    setState(() => _signingOut = true);
 
-  Future<void> _signOut({String? notice}) async {
-    setState(() => _notice = notice);
-    await SapsAuthService.instance.signOut();
-    if (mounted) setState(() => _stage = _Stage.login);
+    try {
+      await SapsAuthService.instance.signOut();
+
+      if (!mounted) return;
+
+      context.go('/login');
+    } catch (error) {
+      debugPrint('SafeSense SAPS sign-out error: $error');
+
+      if (!mounted) return;
+
+      setState(() => _signingOut = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to sign out. Please try again.',
+          ),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    switch (_stage) {
-      case _Stage.checking:
-        return const Scaffold(
-          backgroundColor: SapsColors.blue,
-          body: Center(child: CircularProgressIndicator(color: Colors.white)),
-        );
-      case _Stage.login:
-        return SapsLoginScreen(
-          notice: _notice,
-          onAuthorised: () => setState(() {
-            _notice = null;
-            _stage = _Stage.desk;
-          }),
-        );
-      case _Stage.desk:
-        return IdleGuard(
-          onTimeout: () => _signOut(
-              notice: 'You were signed out after 10 minutes of inactivity.'),
-          child: SapsCaseDeskScreen(onSignOut: () => _signOut()),
-        );
+    if (_checking || _signingOut) {
+      return const Scaffold(
+        backgroundColor: SapsColors.blue,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Colors.white,
+          ),
+        ),
+      );
     }
+
+    if (!_authorised) {
+      return const Scaffold(
+        body: Center(
+          child: Text('SAPS Officer access required.'),
+        ),
+      );
+    }
+
+    return IdleGuard(
+      onTimeout: _signOut,
+      child: SapsCaseDeskScreen(
+        onSignOut: _signOut,
+      ),
+    );
   }
 }

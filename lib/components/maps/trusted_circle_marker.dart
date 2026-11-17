@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 
-/// Solid coloured dot with a soft glow and a pulsing ring.
+/// Glowing, pulsing marker. Shows the member's profile picture
+/// when available, otherwise an icon.
 class TrustedCircleMarker extends StatefulWidget {
   final Color color;
+  final String? avatarUrl;
+  final IconData fallbackIcon;
 
-  const TrustedCircleMarker({super.key, this.color = Colors.purple});
+  const TrustedCircleMarker({
+    super.key,
+    this.color = Colors.purple,
+    this.avatarUrl,
+    this.fallbackIcon = Icons.person,
+  });
 
   @override
   State<TrustedCircleMarker> createState() => _TrustedCircleMarkerState();
@@ -25,20 +33,24 @@ class _TrustedCircleMarkerState extends State<TrustedCircleMarker>
 
   @override
   Widget build(BuildContext context) {
+    final fallback = Center(
+      child: Icon(widget.fallbackIcon, color: Colors.white, size: 20),
+    );
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
-        final t = _controller.value; // 0 -> 1, repeating
+        final t = _controller.value;
 
         return Stack(
           alignment: Alignment.center,
           children: [
-            // Pulsing ring: grows and fades out
+            // Pulsing ring
             Transform.scale(
-              scale: 1 + t * 1.1,
+              scale: 1 + t * 1.0,
               child: Container(
-                width: 30,
-                height: 30,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: widget.color.withOpacity((1 - t) * 0.45),
@@ -46,10 +58,10 @@ class _TrustedCircleMarkerState extends State<TrustedCircleMarker>
               ),
             ),
 
-            // Solid glowing core
+            // Solid glowing core with avatar
             Container(
-              width: 30,
-              height: 30,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
                 color: widget.color,
                 shape: BoxShape.circle,
@@ -62,10 +74,16 @@ class _TrustedCircleMarkerState extends State<TrustedCircleMarker>
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.person,
-                color: Colors.white,
-                size: 16,
+              child: ClipOval(
+                child: widget.avatarUrl == null
+                    ? fallback
+                    : Image.network(
+                        widget.avatarUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => fallback,
+                        loadingBuilder: (context, child, progress) =>
+                            progress == null ? child : fallback,
+                      ),
               ),
             ),
           ],

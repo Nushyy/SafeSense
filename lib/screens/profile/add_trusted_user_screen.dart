@@ -1,13 +1,16 @@
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../services/trusted_circle_repository.dart';
+import '../../services/profile_repository.dart';
 
 class AddTrustedUserScreen extends StatefulWidget {
   const AddTrustedUserScreen({super.key});
 
   @override
-  State<AddTrustedUserScreen> createState() => _AddTrustedUserScreenState();
+  State<AddTrustedUserScreen> createState() =>
+      _AddTrustedUserScreenState();
 }
 
 class _AddTrustedUserScreenState extends State<AddTrustedUserScreen> {
@@ -28,7 +31,9 @@ class _AddTrustedUserScreenState extends State<AddTrustedUserScreen> {
 
   Future<void> _search() async {
     FocusScope.of(context).unfocus();
+
     final username = _usernameController.text.trim();
+
     if (username.isEmpty) {
       setState(() {
         _match = null;
@@ -47,22 +52,29 @@ class _AddTrustedUserScreenState extends State<AddTrustedUserScreen> {
     });
 
     try {
-      final match = await TrustedCircleRepository.searchUsername(username);
+      final match =
+          await TrustedCircleRepository.searchUsername(username);
+
       if (!mounted) return;
 
       if (match == null) {
         setState(() {
           _searched = true;
-          _message = 'No SafeSense account was found with that username. Check the spelling and try again.';
+          _message =
+              'No SafeSense account was found with that username. '
+              'Check the spelling and try again.';
           _messageIsError = true;
         });
         return;
       }
 
-      if (match.id == Supabase.instance.client.auth.currentUser?.id) {
+      if (match.id ==
+          Supabase.instance.client.auth.currentUser?.id) {
         setState(() {
           _searched = true;
-          _message = 'That username belongs to your own account. You cannot add yourself.';
+          _message =
+              'That username belongs to your own account. '
+              'You cannot add yourself.';
           _messageIsError = true;
         });
         return;
@@ -71,18 +83,22 @@ class _AddTrustedUserScreenState extends State<AddTrustedUserScreen> {
       setState(() {
         _match = match;
         _searched = true;
-        _message = 'Account found. Confirm this is the person you want to invite.';
+        _message =
+            'Account found. Confirm this is the person you want to invite.';
         _messageIsError = false;
       });
     } catch (error) {
       if (!mounted) return;
+
       setState(() {
         _searched = true;
         _message = _friendlyError(error);
         _messageIsError = true;
       });
     } finally {
-      if (mounted) setState(() => _searching = false);
+      if (mounted) {
+        setState(() => _searching = false);
+      }
     }
   }
 
@@ -97,43 +113,119 @@ class _AddTrustedUserScreenState extends State<AddTrustedUserScreen> {
 
     try {
       await TrustedCircleRepository.sendRequest(match.username);
+
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Request sent to ${match.displayUsername}.')),
+        SnackBar(
+          content: Text(
+            'Request sent to ${match.displayUsername}.',
+          ),
+        ),
       );
+
       Navigator.pop(context, true);
     } catch (error) {
       if (!mounted) return;
+
       setState(() {
         _message = _friendlyError(error);
         _messageIsError = true;
       });
     } finally {
-      if (mounted) setState(() => _sending = false);
+      if (mounted) {
+        setState(() => _sending = false);
+      }
     }
   }
 
   String _friendlyError(Object error) {
-    final raw = error.toString()
+    final raw = error
+        .toString()
         .replaceFirst('Exception: ', '')
         .replaceFirst('Bad state: ', '')
         .replaceFirst('PostgrestException(message: ', '');
+
     if (raw.toLowerCase().contains('already sent')) {
       return 'You have already sent this person a request.';
     }
+
     if (raw.toLowerCase().contains('already sent you')) {
-      return 'This person has already requested to join your circle. Check Incoming Requests.';
+      return 'This person has already requested to join your circle. '
+          'Check Incoming Requests.';
     }
+
     if (raw.toLowerCase().contains('already in')) {
       return 'This person is already in your Trusted Circle.';
     }
+
     if (raw.toLowerCase().contains('no safesense user')) {
       return 'No SafeSense account was found with that username.';
     }
+
     if (raw.toLowerCase().contains('cannot add yourself')) {
       return 'You cannot add your own account.';
     }
+
     return raw;
+  }
+
+  String _initials(String name) {
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+
+    if (parts.isEmpty) return 'S';
+
+    if (parts.length == 1) {
+      return parts.first[0].toUpperCase();
+    }
+
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
+
+  Widget _buildAvatar(
+    TrustedProfileMatch match,
+    ColorScheme colors,
+  ) {
+    final avatarUrl =
+        ProfileRepository.getAvatarUrl(match.avatarPath);
+
+    return CircleAvatar(
+      radius: 28,
+      backgroundColor: colors.primaryContainer,
+      child: ClipOval(
+        child: avatarUrl != null
+            ? Image.network(
+                avatarUrl,
+                width: 56,
+                height: 56,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _fallbackAvatar(
+                  match.fullName,
+                  colors,
+                ),
+              )
+            : _fallbackAvatar(match.fullName, colors),
+      ),
+    );
+  }
+
+  Widget _fallbackAvatar(
+    String name,
+    ColorScheme colors,
+  ) {
+    return Center(
+      child: Text(
+        _initials(name),
+        style: TextStyle(
+          color: colors.onPrimaryContainer,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
   }
 
   @override
@@ -142,7 +234,9 @@ class _AddTrustedUserScreenState extends State<AddTrustedUserScreen> {
     final colors = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Trusted Person')),
+      appBar: AppBar(
+        title: const Text('Add Trusted Person'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -155,11 +249,17 @@ class _AddTrustedUserScreenState extends State<AddTrustedUserScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.person_search_outlined, color: colors.onPrimaryContainer, size: 30),
+                Icon(
+                  Icons.person_search_outlined,
+                  color: colors.onPrimaryContainer,
+                  size: 30,
+                ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Text(
-                    'Search for an existing SafeSense username before sending a request. No request is sent until you confirm the account below.',
+                    'Search for an existing SafeSense username before '
+                    'sending a request. No request is sent until you '
+                    'confirm the account below.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: colors.onPrimaryContainer,
                       height: 1.4,
@@ -186,7 +286,9 @@ class _AddTrustedUserScreenState extends State<AddTrustedUserScreen> {
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
                       )
                     : const Icon(Icons.search),
               ),
@@ -198,7 +300,9 @@ class _AddTrustedUserScreenState extends State<AddTrustedUserScreen> {
             child: OutlinedButton.icon(
               onPressed: _searching ? null : _search,
               icon: const Icon(Icons.search),
-              label: Text(_searching ? 'Searching…' : 'Search SafeSense'),
+              label: Text(
+                _searching ? 'Searching…' : 'Search SafeSense',
+              ),
             ),
           ),
           if (_searched && _message != null) ...[
@@ -215,7 +319,9 @@ class _AddTrustedUserScreenState extends State<AddTrustedUserScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    _messageIsError ? Icons.error_outline : Icons.check_circle_outline,
+                    _messageIsError
+                        ? Icons.error_outline
+                        : Icons.check_circle_outline,
                     color: _messageIsError
                         ? colors.onErrorContainer
                         : colors.onSecondaryContainer,
@@ -242,21 +348,13 @@ class _AddTrustedUserScreenState extends State<AddTrustedUserScreen> {
               decoration: BoxDecoration(
                 color: colors.surface,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: colors.outlineVariant),
+                border: Border.all(
+                  color: colors.outlineVariant,
+                ),
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: colors.primaryContainer,
-                    child: Text(
-                      _initials(_match!.fullName),
-                      style: TextStyle(
-                        color: colors.onPrimaryContainer,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
+                  _buildAvatar(_match!, colors),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -280,7 +378,10 @@ class _AddTrustedUserScreenState extends State<AddTrustedUserScreen> {
                       ],
                     ),
                   ),
-                  Icon(Icons.verified_user_outlined, color: colors.primary),
+                  Icon(
+                    Icons.verified_user_outlined,
+                    color: colors.primary,
+                  ),
                 ],
               ),
             ),
@@ -299,20 +400,14 @@ class _AddTrustedUserScreenState extends State<AddTrustedUserScreen> {
                         ),
                       )
                     : const Icon(Icons.person_add_alt_1),
-                label: Text(_sending ? 'Sending…' : 'Send request'),
+                label: Text(
+                  _sending ? 'Sending…' : 'Send request',
+                ),
               ),
             ),
           ],
         ],
       ),
     );
-  }
-
-  String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty).toList();
-    if (parts.isEmpty) return 'S';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 }
