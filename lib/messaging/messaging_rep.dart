@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
+import '../community/avatar_url.dart';
 import '../community/community_data.dart';
 import '../theme/app_colors.dart';
 
@@ -87,7 +88,7 @@ class MessagingRepository {
       name: (m?['display_name'] as String?) ?? 'Neighbour',
       color: _avatarColors[
           id.codeUnits.fold<int>(0, (a, b) => a + b) % _avatarColors.length],
-      verified: (m?['verified'] as bool?) ?? false,
+      avatarUrl: avatarUrlFromPath(m?['avatar_path'] as String?),
     );
   }
 
@@ -96,7 +97,7 @@ class MessagingRepository {
     if (missing.isEmpty) return;
     final rows = await _db
         .from('public_profiles')
-        .select('id, display_name, verified')
+        .select('id, display_name, avatar_path')
         .inFilter('id', missing);
     for (final r in rows) {
       final m = Map<String, dynamic>.from(r as Map);

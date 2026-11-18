@@ -12,8 +12,10 @@ void main() {
     // Verify that the bulletin board screen is displayed.
     expect(find.text('Bulletin Board'), findsOneWidget);
 
-    // Verify that the area selector is displayed.
-    expect(find.text('All areas'), findsOneWidget);
+    // Verify that all three location dropdowns are displayed.
+    expect(find.text('Province'), findsOneWidget);
+    expect(find.text('City / town'), findsOneWidget);
+    expect(find.text('Suburb'), findsOneWidget);
 
     // Verify that the category filter is displayed.
     expect(find.text('All'), findsOneWidget);

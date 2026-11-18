@@ -158,11 +158,6 @@ class _CommentTile extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13)),
                       ),
-                      if (comment.author.verified) ...[
-                        const SizedBox(width: 4),
-                        const Icon(Icons.verified,
-                            size: 14, color: AppColors.primaryBlue),
-                      ],
                     ],
                   ),
                   const SizedBox(height: 2),

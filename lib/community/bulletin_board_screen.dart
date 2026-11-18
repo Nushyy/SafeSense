@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../messaging/inbox_screen.dart';
 import '../messaging/messaging_rep.dart';
 import '../theme/app_colors.dart';
-import 'area_picker.dart';
 import 'bottom_nav_scaffold.dart';
 import 'community_data.dart';
 import 'create_post_screen.dart';
@@ -19,26 +18,18 @@ class BulletinBoardScreen extends StatefulWidget {
 
 class _BulletinBoardScreenState
     extends State<BulletinBoardScreen> {
-  Suburb? _area;
+  String? _province; // dropdown 1
+  Suburb? _town; // dropdown 2 (city / town)
+  Suburb? _suburb; // dropdown 3 (suburb / village)
   CrimeCategory? _category;
 
   void _openCreatePost() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => CreatePostScreen(initialArea: _area),
+        builder: (_) => CreatePostScreen(initialArea: _suburb ?? _town),
       ),
     );
-  }
-
-  Future<void> _openAreaPicker() async {
-    final choice = await showAreaPicker(
-      context,
-      selected: _area,
-      allowAll: true, // "Other" is only offered on the Create post screen
-    );
-    if (choice == null) return;
-    setState(() => _area = choice.area);
   }
 
   void _openPostDetail(Post post, {bool focusReply = false}) {
@@ -58,10 +49,21 @@ class _BulletinBoardScreenState
       child: Column(
         children: [
           _Header(
-            area: _area,
+            province: _province,
+            town: _town,
+            suburb: _suburb,
             category: _category,
             onPost: _openCreatePost,
-            onAreaTap: _openAreaPicker,
+            onProvince: (value) => setState(() {
+              _province = value;
+              _town = null;
+              _suburb = null;
+            }),
+            onTown: (value) => setState(() {
+              _town = value;
+              _suburb = null;
+            }),
+            onSuburb: (value) => setState(() => _suburb = value),
             onCategory: (category) {
               setState(() => _category = category);
             },
@@ -80,7 +82,12 @@ class _BulletinBoardScreenState
                   );
                 }
                 final posts = communityRepo.posts(
-                  area: _area,
+                  areaIds: areaIdsFor(
+                    communityRepo.areas,
+                    province: _province,
+                    town: _town,
+                    suburb: _suburb,
+                  ),
                   category: _category,
                 );
 
@@ -117,17 +124,25 @@ class _BulletinBoardScreenState
 }
 
 class _Header extends StatelessWidget {
-  final Suburb? area;
+  final String? province;
+  final Suburb? town;
+  final Suburb? suburb;
   final CrimeCategory? category;
   final VoidCallback onPost;
-  final VoidCallback onAreaTap;
+  final ValueChanged<String?> onProvince;
+  final ValueChanged<Suburb?> onTown;
+  final ValueChanged<Suburb?> onSuburb;
   final ValueChanged<CrimeCategory?> onCategory;
 
   const _Header({
-    required this.area,
+    required this.province,
+    required this.town,
+    required this.suburb,
     required this.category,
     required this.onPost,
-    required this.onAreaTap,
+    required this.onProvince,
+    required this.onTown,
+    required this.onSuburb,
     required this.onCategory,
   });
 
@@ -210,36 +225,13 @@ class _Header extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 6),
-              InkWell(
-                onTap: onAreaTap,
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 4,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.place_outlined,
-                        color: Colors.white70,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        area?.label ?? 'All areas',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const Icon(
-                        Icons.arrow_drop_down,
-                        color: Colors.white70,
-                      ),
-                    ],
-                  ),
-                ),
+              _AreaFilters(
+                province: province,
+                town: town,
+                suburb: suburb,
+                onProvince: onProvince,
+                onTown: onTown,
+                onSuburb: onSuburb,
               ),
               const SizedBox(height: 10),
               SizedBox(
@@ -269,6 +261,157 @@ class _Header extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Three dropdowns side by side: province, city / town, suburb / village.
+class _AreaFilters extends StatelessWidget {
+  final String? province;
+  final Suburb? town;
+  final Suburb? suburb;
+  final ValueChanged<String?> onProvince;
+  final ValueChanged<Suburb?> onTown;
+  final ValueChanged<Suburb?> onSuburb;
+
+  const _AreaFilters({
+    required this.province,
+    required this.town,
+    required this.suburb,
+    required this.onProvince,
+    required this.onTown,
+    required this.onSuburb,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final areas = communityRepo.areas;
+    final provinces = {
+      for (final a in areas)
+        if (a.province.isNotEmpty) a.province,
+    }.toList()
+      ..sort();
+    final towns = province == null
+        ? <Suburb>[]
+        : (areas.where((a) => a.province == province && a.isTown).toList()
+          ..sort((a, b) => a.name.compareTo(b.name)));
+    final suburbs = town == null
+        ? <Suburb>[]
+        : (areas
+            .where((a) =>
+                a.province == town!.province &&
+                a.isSuburbOrVillage &&
+                a.city == town!.name)
+            .toList()
+          ..sort((a, b) => a.name.compareTo(b.name)));
+
+    return Row(
+      children: [
+        Expanded(
+          child: _FilterDropdown<String>(
+            hint: 'Province',
+            allLabel: 'All provinces',
+            value: province,
+            items: provinces,
+            labelOf: (p) => p,
+            onChanged: onProvince,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _FilterDropdown<Suburb>(
+            hint: 'City / town',
+            allLabel: 'All cities / towns',
+            value: town,
+            items: towns,
+            labelOf: (a) => a.name,
+            onChanged: onTown,
+            enabled: province != null,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _FilterDropdown<Suburb>(
+            hint: 'Suburb',
+            allLabel: 'All suburbs / villages',
+            value: suburb,
+            items: suburbs,
+            labelOf: (a) => a.name,
+            onChanged: onSuburb,
+            enabled: suburbs.isNotEmpty,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FilterDropdown<T> extends StatelessWidget {
+  final String hint;
+  final String allLabel;
+  final T? value;
+  final List<T> items;
+  final String Function(T) labelOf;
+  final ValueChanged<T?> onChanged;
+  final bool enabled;
+
+  const _FilterDropdown({
+    required this.hint,
+    required this.allLabel,
+    required this.value,
+    required this.items,
+    required this.labelOf,
+    required this.onChanged,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const shown = TextStyle(color: Colors.white, fontSize: 13);
+    return Opacity(
+      opacity: enabled ? 1 : 0.5,
+      child: Container(
+        padding: const EdgeInsets.only(left: 12, right: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<T?>(
+            isExpanded: true,
+            value: value,
+            dropdownColor: AppColors.surface,
+            iconEnabledColor: Colors.white,
+            iconDisabledColor: Colors.white54,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            // What the closed dropdown shows (white, on the blue header).
+            selectedItemBuilder: (context) => [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(hint, style: shown, overflow: TextOverflow.ellipsis),
+              ),
+              for (final item in items)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(labelOf(item),
+                      style: shown, overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            items: [
+              DropdownMenuItem<T?>(
+                value: null,
+                child: Text(allLabel, overflow: TextOverflow.ellipsis),
+              ),
+              for (final item in items)
+                DropdownMenuItem<T?>(
+                  value: item,
+                  child: Text(labelOf(item), overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            onChanged: enabled ? onChanged : null,
           ),
         ),
       ),

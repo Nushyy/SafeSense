@@ -6,22 +6,40 @@ import '../messaging/messaging_rep.dart';
 import '../messaging/private_chat_screen.dart';
 import 'share_post_screen.dart';
 
+/// Profile picture if the user has one, otherwise their initials.
 class UserAvatar extends StatelessWidget {
   final AppUser user;
   final double radius;
   const UserAvatar({super.key, required this.user, this.radius = 22});
 
+  Widget _initials() => CircleAvatar(
+        radius: radius,
+        backgroundColor: user.color,
+        child: Text(
+          user.initials,
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: radius * 0.7,
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: user.color,
-      child: Text(
-        user.initials,
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
-          fontSize: radius * 0.7,
+    final url = user.avatarUrl;
+    if (url == null) return _initials();
+    return SizedBox(
+      width: radius * 2,
+      height: radius * 2,
+      child: ClipOval(
+        child: Image.network(
+          url,
+          fit: BoxFit.cover,
+          // While loading, or if the picture cannot be loaded: show the initials.
+          errorBuilder: (_, _, _) => _initials(),
+          loadingBuilder: (context, child, progress) =>
+              progress == null ? child : _initials(),
         ),
       ),
     );
@@ -125,11 +143,6 @@ class PostCard extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              if (post.author.verified) ...[
-                                const SizedBox(width: 4),
-                                const Icon(Icons.verified,
-                                    size: 16, color: AppColors.primaryBlue),
-                              ],
                             ],
                           ),
                           Text(

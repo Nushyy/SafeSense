@@ -12,12 +12,57 @@ class City {
   const City(this.name, this.suburbs);
 }
 
+/// One row of the areas table (a town, city, suburb or village).
 class Suburb {
   final String id;
   final String name;
+
+  /// The areas table's group_name: the town for a suburb, the province for a town.
   final String city;
-  const Suburb(this.id, this.name, this.city);
+  final String province;
+
+  /// 'city', 'town', 'village' or 'suburb' (the kind column).
+  final String kind;
+
+  const Suburb(this.id, this.name, this.city,
+      {this.province = '', this.kind = ''});
+
   String get label => '$name, $city';
+  bool get isTown => kind == 'city' || kind == 'town';
+  bool get isSuburbOrVillage => kind == 'suburb' || kind == 'village';
+
+  @override
+  bool operator ==(Object other) => other is Suburb && other.id == id;
+  @override
+  int get hashCode => id.hashCode;
+}
+
+/// Ids of every area inside the chosen province / town / suburb.
+/// Returns null when nothing is chosen (= show everything).
+Set<String>? areaIdsFor(
+  List<Suburb> areas, {
+  String? province,
+  Suburb? town,
+  Suburb? suburb,
+}) {
+  if (suburb != null) return {suburb.id};
+  if (town != null) {
+    return {
+      town.id,
+      for (final a in areas)
+        if (a.province == town.province &&
+            a.isSuburbOrVillage &&
+            a.city == town.name)
+          a.id,
+    };
+  }
+  if (province != null) {
+    return {
+      for (final a in areas)
+        if (a.province == province) a.id,
+    };
+  }
+  return null;
 }
 
 class AppUser {
@@ -25,11 +70,15 @@ class AppUser {
   final String name;
   final Color color;
   final bool verified;
+
+  /// Link to the profile picture (null = show the initials instead).
+  final String? avatarUrl;
   const AppUser({
     required this.id,
     required this.name,
     required this.color,
     this.verified = false,
+    this.avatarUrl,
   });
 
   String get initials {
@@ -119,7 +168,6 @@ class PostAttachment {
   }
 }
 
-
 class Comment {
   final String id;
   final AppUser author;
@@ -196,9 +244,12 @@ abstract class CommunityRepository extends ChangeNotifier {
 
   AppUser get currentUser;
   List<City> get cities;
+
+  /// Every area as one flat list (for the province / town / suburb filters).
+  List<Suburb> get areas => [for (final c in cities) ...c.suburbs];
   Suburb? suburbById(String id);
   List<CrimeCategory> get categories;
-  List<Post> posts({Suburb? area, CrimeCategory? category});
+  List<Post> posts({Set<String>? areaIds, CrimeCategory? category});
 
   /// Pass either [area] or [otherArea] (free text, when the user chose 'Other').
   Future<void> addPost({
@@ -236,19 +287,37 @@ class InMemoryCommunityRepository extends CommunityRepository {
   @override
   AppUser get currentUser => me;
 
+  // Dummy areas, shaped like the areas table (province > town > suburb).
   static const _cities = [
+    City('Free State', [
+      Suburb('fs-bloemfontein', 'Bloemfontein', 'Free State',
+          province: 'Free State', kind: 'town'),
+    ]),
     City('Bloemfontein', [
-      Suburb('bfn-heidedal', 'Heidedal', 'Bloemfontein'),
-      Suburb('bfn-universitas', 'Universitas', 'Bloemfontein'),
-      Suburb('bfn-langenhoven', 'Langenhoven Park', 'Bloemfontein'),
-      Suburb('bfn-pentagon', 'Pentagon Park', 'Bloemfontein'),
+      Suburb('bfn-heidedal', 'Heidedal', 'Bloemfontein',
+          province: 'Free State', kind: 'suburb'),
+      Suburb('bfn-universitas', 'Universitas', 'Bloemfontein',
+          province: 'Free State', kind: 'suburb'),
+      Suburb('bfn-langenhoven', 'Langenhoven Park', 'Bloemfontein',
+          province: 'Free State', kind: 'suburb'),
+      Suburb('bfn-pentagon', 'Pentagon Park', 'Bloemfontein',
+          province: 'Free State', kind: 'suburb'),
+    ]),
+    City('Gauteng', [
+      Suburb('gp-johannesburg', 'Johannesburg', 'Gauteng',
+          province: 'Gauteng', kind: 'town'),
     ]),
     City('Johannesburg', [
-      Suburb('jhb-soweto', 'Soweto', 'Johannesburg'),
-      Suburb('jhb-sandton', 'Sandton', 'Johannesburg'),
-      Suburb('jhb-randburg', 'Randburg', 'Johannesburg'),
-      Suburb('jhb-eldorado', 'Eldorado Park', 'Johannesburg'),
-      Suburb('jhb-florida', 'Florida Park', 'Johannesburg'),
+      Suburb('jhb-soweto', 'Soweto', 'Johannesburg',
+          province: 'Gauteng', kind: 'suburb'),
+      Suburb('jhb-sandton', 'Sandton', 'Johannesburg',
+          province: 'Gauteng', kind: 'suburb'),
+      Suburb('jhb-randburg', 'Randburg', 'Johannesburg',
+          province: 'Gauteng', kind: 'suburb'),
+      Suburb('jhb-eldorado', 'Eldorado Park', 'Johannesburg',
+          province: 'Gauteng', kind: 'suburb'),
+      Suburb('jhb-florida', 'Florida Park', 'Johannesburg',
+          province: 'Gauteng', kind: 'suburb'),
     ]),
   ];
 
@@ -366,9 +435,10 @@ class InMemoryCommunityRepository extends CommunityRepository {
   ];
 
   @override
-  List<Post> posts({Suburb? area, CrimeCategory? category}) {
+  List<Post> posts({Set<String>? areaIds, CrimeCategory? category}) {
     final result = _posts.where((p) {
-      final areaOk = area == null || p.areaId == area.id;
+      final areaOk =
+          areaIds == null || (p.areaId != null && areaIds.contains(p.areaId));
       final categoryOk = category == null || p.category == category;
       return areaOk && categoryOk;
     }).toList();

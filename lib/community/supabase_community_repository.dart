@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../theme/app_colors.dart';
+import 'avatar_url.dart';
 import 'community_data.dart';
 
 /// Real database version of the community repository.
@@ -96,7 +97,7 @@ class SupabaseCommunityRepository extends CommunityRepository {
     while (true) {
       final rows = await _db
           .from('areas')
-          .select('id, name, group_name')
+          .select('id, name, group_name, province, kind')
           .order('group_name')
           .order('name')
           .range(from, from + page - 1);
@@ -113,7 +114,13 @@ class SupabaseCommunityRepository extends CommunityRepository {
       final group = r['group_name'] as String;
       groups
           .putIfAbsent(group, () => [])
-          .add(Suburb(r['id'] as String, r['name'] as String, group));
+          .add(Suburb(
+            r['id'] as String,
+            r['name'] as String,
+            group,
+            province: r['province'] as String,
+            kind: r['kind'] as String,
+          ));
     }
     _cities = [for (final e in groups.entries) City(e.key, e.value)];
     _areasById
@@ -153,7 +160,7 @@ class SupabaseCommunityRepository extends CommunityRepository {
       final end = i + 100 > list.length ? list.length : i + 100;
       final rows = await _db
           .from('public_profiles')
-          .select('id, display_name, verified')
+          .select('id, display_name, avatar_path')
           .inFilter('id', list.sublist(i, end));
       for (final r in rows) {
         final m = Map<String, dynamic>.from(r as Map);
@@ -169,7 +176,7 @@ class SupabaseCommunityRepository extends CommunityRepository {
       name: (m?['display_name'] as String?) ?? 'Neighbour',
       color: _avatarColors[
           id.codeUnits.fold<int>(0, (a, b) => a + b) % _avatarColors.length],
-      verified: (m?['verified'] as bool?) ?? false,
+      avatarUrl: avatarUrlFromPath(m?['avatar_path'] as String?),
     );
   }
 
@@ -282,9 +289,10 @@ class SupabaseCommunityRepository extends CommunityRepository {
   // ------------------------------------------------------------------
 
   @override
-  List<Post> posts({Suburb? area, CrimeCategory? category}) {
+  List<Post> posts({Set<String>? areaIds, CrimeCategory? category}) {
     return _posts.where((p) {
-      final areaOk = area == null || p.areaId == area.id;
+      final areaOk =
+          areaIds == null || (p.areaId != null && areaIds.contains(p.areaId));
       final categoryOk = category == null || p.category == category;
       return areaOk && categoryOk;
     }).toList()
@@ -310,24 +318,18 @@ class SupabaseCommunityRepository extends CommunityRepository {
     String? path;
     String? url;
     if (attachment != null) {
-  final bytes = attachment.bytes;
-
-  if (bytes != null) {
-    final safeName =
-        attachment.name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
-    path = '$uid/${DateTime.now().microsecondsSinceEpoch}_$safeName';
-
-    await _db.storage.from(_bucket).uploadBinary(
-          path,
-          bytes,
-          fileOptions: sb.FileOptions(contentType: attachment.mimeType),
-        );
-
-    url = _db.storage.from(_bucket).getPublicUrl(path);
-  } else {
-    url = attachment.url;
-  }
-}
+      final bytes = attachment.bytes;
+      if (bytes == null) throw StateError('Attachment has no data to upload.');
+      final safeName =
+          attachment.name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+      path = '$uid/${DateTime.now().microsecondsSinceEpoch}_$safeName';
+      await _db.storage.from(_bucket).uploadBinary(
+            path,
+            bytes,
+            fileOptions: sb.FileOptions(contentType: attachment.mimeType),
+          );
+      url = _db.storage.from(_bucket).getPublicUrl(path);
+    }
 
     // 2. Save the post. If this fails, remove the file we just uploaded.
     try {

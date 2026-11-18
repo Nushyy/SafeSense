@@ -75,11 +75,6 @@ class _InboxScreenState extends State<InboxScreen> {
                                     ? FontWeight.w800
                                     : FontWeight.w600)),
                       ),
-                      if (c.other.verified) ...[
-                        const SizedBox(width: 4),
-                        const Icon(Icons.verified,
-                            size: 15, color: AppColors.primaryBlue),
-                      ],
                     ],
                   ),
                   subtitle: Text(
@@ -145,4 +140,3 @@ class _InboxScreenState extends State<InboxScreen> {
     );
   }
 }
- 

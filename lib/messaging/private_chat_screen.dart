@@ -146,10 +146,6 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
               child: Text(widget.other.name,
                   maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
-            if (widget.other.verified) ...[
-              const SizedBox(width: 4),
-              const Icon(Icons.verified, size: 16, color: Colors.white),
-            ],
           ],
         ),
       ),
