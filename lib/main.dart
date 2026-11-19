@@ -1,50 +1,45 @@
-import 'dart:async';
+﻿import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'community/bulletin_board_screen.dart';
+
 import 'community/community_data.dart';
 import 'community/supabase_community_repository.dart';
 import 'config/supabase_config.dart';
-import 'theme/app_colors.dart';
+import 'core/theme/app_theme.dart';
+import 'features/auth/screens/login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Read the Supabase details from .env (see .env.example).
-  try {
-    await dotenv.load(fileName: '.env');
-  } catch (_) {
-    debugPrint('No .env file found: running on dummy data.');
+  await dotenv.load(fileName: '.env');
+
+  if (!SupabaseConfig.isConfigured) {
+    throw Exception('Supabase configuration is missing or invalid.');
   }
 
-  // Use the real database when the details are there, otherwise dummy data.
-  if (SupabaseConfig.isConfigured) {
-    await Supabase.initialize(
-      url: SupabaseConfig.url,
-      publishableKey: SupabaseConfig.anonKey,
-    );
-    communityRepo = SupabaseCommunityRepository();
-    unawaited(communityRepo.init());
-  }
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    publishableKey: SupabaseConfig.anonKey,
+  );
 
-  runApp(const SafeSenseApp());
+  communityRepo = SupabaseCommunityRepository();
+  unawaited(communityRepo.init());
+
+  runApp(const MyApp());
 }
 
-class SafeSenseApp extends StatelessWidget {
-  const SafeSenseApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'SafeSense',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primaryBlue),
-        scaffoldBackgroundColor: AppColors.background,
-      ),
-      home: const BulletinBoardScreen(),
+      theme: AppTheme.lightTheme,
+      home: const LoginScreen(),
     );
   }
 }

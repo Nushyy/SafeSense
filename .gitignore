@@ -1,4 +1,4 @@
-# Miscellaneous
+﻿# Miscellaneous
 *.class
 *.log
 *.pyc
@@ -33,19 +33,8 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Environment secrets
+.env
+
 # Symbolication related
 app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
-
-# Widget Preview related
-.widget_preview/
-
-# Environment variables
-.env 

@@ -1,23 +1,40 @@
-
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:safesense/main.dart';
+
+import 'package:safesense/features/auth/screens/login_screen.dart';
+import 'package:safesense/community/bulletin_board_screen.dart';
 
 void main() {
-  testWidgets('SafeSense bulletin board loads successfully',
+  testWidgets('SafeSense login screen loads successfully',
       (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: LoginScreen(),
+      ),
+    );
 
-    // Launch the SafeSense application.
-    await tester.pumpWidget(const SafeSenseApp());
+    await tester.pumpAndSettle();
 
-    // Verify that the bulletin board screen is displayed.
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('Password'), findsOneWidget);
+    expect(find.text('Login'), findsOneWidget);
+  });
+
+  testWidgets('Community Bulletin Board loads successfully',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: BulletinBoardScreen(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
     expect(find.text('Bulletin Board'), findsOneWidget);
-
-    // Verify that all three location dropdowns are displayed.
     expect(find.text('Province'), findsOneWidget);
     expect(find.text('City / town'), findsOneWidget);
     expect(find.text('Suburb'), findsOneWidget);
-
-    // Verify that the category filter is displayed.
     expect(find.text('All'), findsOneWidget);
   });
 }
