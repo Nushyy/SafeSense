@@ -5,7 +5,10 @@ import 'post_card.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final Post post;
-  const PostDetailScreen({super.key, required this.post});
+
+  /// true when opened from the comment icon: the reply box is focused straight away.
+  final bool focusReply;
+  const PostDetailScreen({super.key, required this.post, this.focusReply = false});
 
   @override
   State<PostDetailScreen> createState() => _PostDetailScreenState();
@@ -24,7 +27,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final text = _replyController.text.trim();
     if (text.isEmpty) return;
     _replyController.clear();
-    await communityRepo.addComment(widget.post, text);
+    try {
+      await communityRepo.addComment(widget.post, text);
+    } catch (_) {
+      if (!mounted) return;
+      _replyController.text = text; // give the text back so nothing is lost
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not send your reply. Try again.')),
+      );
+    }
   }
 
   @override
@@ -49,7 +60,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     PostCard(
                       post: post,
                       expanded: true,
-                      onLike: () => communityRepo.toggleLike(post),
                     ),
                     const SizedBox(height: 20),
                     Text(
@@ -77,6 +87,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       children: [
                         Expanded(
                           child: TextField(
+                            autofocus: widget.focusReply,
                             controller: _replyController,
                             textCapitalization: TextCapitalization.sentences,
                             decoration: InputDecoration(
@@ -147,11 +158,6 @@ class _CommentTile extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13)),
                       ),
-                      if (comment.author.verified) ...[
-                        const SizedBox(width: 4),
-                        const Icon(Icons.verified,
-                            size: 14, color: AppColors.primaryBlue),
-                      ],
                     ],
                   ),
                   const SizedBox(height: 2),

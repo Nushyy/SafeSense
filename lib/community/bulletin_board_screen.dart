@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import '../messaging/inbox_screen.dart';
+import '../messaging/messaging_rep.dart';
 import '../theme/app_colors.dart';
+import 'bottom_nav_scaffold.dart';
 import 'community_data.dart';
 import 'create_post_screen.dart';
 import 'post_card.dart';
@@ -9,75 +12,105 @@ class BulletinBoardScreen extends StatefulWidget {
   const BulletinBoardScreen({super.key});
 
   @override
-  State<BulletinBoardScreen> createState() => _BulletinBoardScreenState();
+  State<BulletinBoardScreen> createState() =>
+      _BulletinBoardScreenState();
 }
 
-class _BulletinBoardScreenState extends State<BulletinBoardScreen> {
-  Suburb? _area; // null = all areas
-  PostCategory? _category; // null = All
+class _BulletinBoardScreenState
+    extends State<BulletinBoardScreen> {
+  String? _province; // dropdown 1
+  Suburb? _town; // dropdown 2 (city / town)
+  Suburb? _suburb; // dropdown 3 (suburb / village)
+  CrimeCategory? _category;
 
   void _openCreatePost() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => CreatePostScreen(initialArea: _area)),
+      MaterialPageRoute(
+        builder: (_) => CreatePostScreen(initialArea: _suburb ?? _town),
+      ),
     );
   }
 
-  void _openAreaPicker() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => _AreaPickerSheet(
-        selected: _area,
-        onSelected: (area) {
-          setState(() => _area = area);
-          Navigator.pop(sheetContext);
-        },
+  void _openPostDetail(Post post, {bool focusReply = false}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PostDetailScreen(post: post, focusReply: focusReply),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      // TODO: the team's navigation bar goes here (bottomNavigationBar).
-      body: Column(
+    return BottomNavScaffold(
+      currentIndex: 3,
+      title: 'Alerts',
+      child: Column(
         children: [
           _Header(
-            area: _area,
+            province: _province,
+            town: _town,
+            suburb: _suburb,
             category: _category,
             onPost: _openCreatePost,
-            onAreaTap: _openAreaPicker,
-            onCategory: (c) => setState(() => _category = c),
+            onProvince: (value) => setState(() {
+              _province = value;
+              _town = null;
+              _suburb = null;
+            }),
+            onTown: (value) => setState(() {
+              _town = value;
+              _suburb = null;
+            }),
+            onSuburb: (value) => setState(() => _suburb = value),
+            onCategory: (category) {
+              setState(() => _category = category);
+            },
           ),
           Expanded(
             child: AnimatedBuilder(
               animation: communityRepo,
               builder: (context, _) {
-                final posts =
-                    communityRepo.posts(area: _area, category: _category);
-                if (posts.isEmpty) {
-                  return _EmptyState(onPost: _openCreatePost);
+                if (communityRepo.isLoading) {
+                  return const Center(child: CircularProgressIndicator());
                 }
+                if (communityRepo.errorMessage != null) {
+                  return _ErrorState(
+                    message: communityRepo.errorMessage!,
+                    onRetry: communityRepo.init,
+                  );
+                }
+                final posts = communityRepo.posts(
+                  areaIds: areaIdsFor(
+                    communityRepo.areas,
+                    province: _province,
+                    town: _town,
+                    suburb: _suburb,
+                  ),
+                  category: _category,
+                );
+
+                if (posts.isEmpty) {
+                  return _EmptyState(
+                    onPost: _openCreatePost,
+                  );
+                }
+
                 return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(
+                    16, 16, 16, 24,
+                  ),
                   itemCount: posts.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 14),
-                  itemBuilder: (context, i) {
-                    final post = posts[i];
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: 14),
+                  itemBuilder: (context, index) {
+                    final post = posts[index];
+
                     return PostCard(
                       post: post,
-                      onLike: () => communityRepo.toggleLike(post),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => PostDetailScreen(post: post)),
-                      ),
+                      onTap: () => _openPostDetail(post),
+                      onComment: () => _openPostDetail(post, focusReply: true),
                     );
                   },
                 );
@@ -91,35 +124,49 @@ class _BulletinBoardScreenState extends State<BulletinBoardScreen> {
 }
 
 class _Header extends StatelessWidget {
-  final Suburb? area;
-  final PostCategory? category;
+  final String? province;
+  final Suburb? town;
+  final Suburb? suburb;
+  final CrimeCategory? category;
   final VoidCallback onPost;
-  final VoidCallback onAreaTap;
-  final ValueChanged<PostCategory?> onCategory;
+  final ValueChanged<String?> onProvince;
+  final ValueChanged<Suburb?> onTown;
+  final ValueChanged<Suburb?> onSuburb;
+  final ValueChanged<CrimeCategory?> onCategory;
 
   const _Header({
-    required this.area,
+    required this.province,
+    required this.town,
+    required this.suburb,
     required this.category,
     required this.onPost,
-    required this.onAreaTap,
+    required this.onProvince,
+    required this.onTown,
+    required this.onSuburb,
     required this.onCategory,
   });
 
   @override
   Widget build(BuildContext context) {
-    final categories = PostCategory.values;
+    final categories = communityRepo.categories;
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [AppColors.heroBlue, AppColors.darkBlue],
+          colors: [
+            AppColors.heroBlue,
+            AppColors.darkBlue,
+          ],
         ),
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          padding: const EdgeInsets.fromLTRB(
+            20, 12, 20, 16,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -130,11 +177,20 @@ class _Header extends StatelessWidget {
                       'Bulletin Board',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 24,
+                        fontSize: 22,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
+                  if (MessagingRepository.isAvailable)
+                    IconButton(
+                      tooltip: 'Messages',
+                      icon: const Icon(Icons.mail_outline, color: Colors.white),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const InboxScreen()),
+                      ),
+                    ),
                   Material(
                     color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
@@ -142,17 +198,25 @@ class _Header extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                       onTap: onPost,
                       child: const Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         child: Row(
                           children: [
-                            Icon(Icons.edit_outlined,
-                                color: Colors.white, size: 16),
+                            Icon(
+                              Icons.edit_outlined,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                             SizedBox(width: 6),
-                            Text('Post',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600)),
+                            Text(
+                              'Post',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -161,26 +225,13 @@ class _Header extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 6),
-              InkWell(
-                onTap: onAreaTap,
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.place_outlined,
-                          color: Colors.white70, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        area?.label ?? 'All areas',
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 14),
-                      ),
-                      const Icon(Icons.arrow_drop_down, color: Colors.white70),
-                    ],
-                  ),
-                ),
+              _AreaFilters(
+                province: province,
+                town: town,
+                suburb: suburb,
+                onProvince: onProvince,
+                onTown: onTown,
+                onSuburb: onSuburb,
               ),
               const SizedBox(height: 10),
               SizedBox(
@@ -188,20 +239,23 @@ class _Header extends StatelessWidget {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: categories.length + 1,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (context, i) {
-                    if (i == 0) {
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
                       return _FilterChip(
                         label: 'All',
                         selected: category == null,
                         onTap: () => onCategory(null),
                       );
                     }
-                    final c = categories[i - 1];
+
+                    final item = categories[index - 1];
+
                     return _FilterChip(
-                      label: c.chipLabel,
-                      selected: category == c,
-                      onTap: () => onCategory(c),
+                      label: item.name,
+                      selected: category == item,
+                      onTap: () => onCategory(item),
                     );
                   },
                 ),
@@ -214,27 +268,189 @@ class _Header extends StatelessWidget {
   }
 }
 
+/// Three dropdowns side by side: province, city / town, suburb / village.
+class _AreaFilters extends StatelessWidget {
+  final String? province;
+  final Suburb? town;
+  final Suburb? suburb;
+  final ValueChanged<String?> onProvince;
+  final ValueChanged<Suburb?> onTown;
+  final ValueChanged<Suburb?> onSuburb;
+
+  const _AreaFilters({
+    required this.province,
+    required this.town,
+    required this.suburb,
+    required this.onProvince,
+    required this.onTown,
+    required this.onSuburb,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final areas = communityRepo.areas;
+    final provinces = {
+      for (final a in areas)
+        if (a.province.isNotEmpty) a.province,
+    }.toList()
+      ..sort();
+    final towns = province == null
+        ? <Suburb>[]
+        : (areas.where((a) => a.province == province && a.isTown).toList()
+          ..sort((a, b) => a.name.compareTo(b.name)));
+    final suburbs = town == null
+        ? <Suburb>[]
+        : (areas
+            .where((a) =>
+                a.province == town!.province &&
+                a.isSuburbOrVillage &&
+                a.city == town!.name)
+            .toList()
+          ..sort((a, b) => a.name.compareTo(b.name)));
+
+    return Row(
+      children: [
+        Expanded(
+          child: _FilterDropdown<String>(
+            hint: 'Province',
+            allLabel: 'All provinces',
+            value: province,
+            items: provinces,
+            labelOf: (p) => p,
+            onChanged: onProvince,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _FilterDropdown<Suburb>(
+            hint: 'City / town',
+            allLabel: 'All cities / towns',
+            value: town,
+            items: towns,
+            labelOf: (a) => a.name,
+            onChanged: onTown,
+            enabled: province != null,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _FilterDropdown<Suburb>(
+            hint: 'Suburb',
+            allLabel: 'All suburbs / villages',
+            value: suburb,
+            items: suburbs,
+            labelOf: (a) => a.name,
+            onChanged: onSuburb,
+            enabled: suburbs.isNotEmpty,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FilterDropdown<T> extends StatelessWidget {
+  final String hint;
+  final String allLabel;
+  final T? value;
+  final List<T> items;
+  final String Function(T) labelOf;
+  final ValueChanged<T?> onChanged;
+  final bool enabled;
+
+  const _FilterDropdown({
+    required this.hint,
+    required this.allLabel,
+    required this.value,
+    required this.items,
+    required this.labelOf,
+    required this.onChanged,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const shown = TextStyle(color: Colors.white, fontSize: 13);
+    return Opacity(
+      opacity: enabled ? 1 : 0.5,
+      child: Container(
+        padding: const EdgeInsets.only(left: 12, right: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<T?>(
+            isExpanded: true,
+            value: value,
+            dropdownColor: AppColors.surface,
+            iconEnabledColor: Colors.white,
+            iconDisabledColor: Colors.white54,
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            // What the closed dropdown shows (white, on the blue header).
+            selectedItemBuilder: (context) => [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(hint, style: shown, overflow: TextOverflow.ellipsis),
+              ),
+              for (final item in items)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(labelOf(item),
+                      style: shown, overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            items: [
+              DropdownMenuItem<T?>(
+                value: null,
+                child: Text(allLabel, overflow: TextOverflow.ellipsis),
+              ),
+              for (final item in items)
+                DropdownMenuItem<T?>(
+                  value: item,
+                  child: Text(labelOf(item), overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            onChanged: enabled ? onChanged : null,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _FilterChip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const _FilterChip(
-      {required this.label, required this.selected, required this.onTap});
+
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? Colors.white : Colors.white.withValues(alpha: 0.14),
+      color: selected
+          ? Colors.white
+          : Colors.white.withValues(alpha: 0.14),
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 8,
+          ),
           child: Text(
             label,
             style: TextStyle(
-              color: selected ? AppColors.darkBlue : Colors.white,
+              color: selected
+                  ? AppColors.darkBlue
+                  : Colors.white,
               fontWeight: FontWeight.w600,
               fontSize: 14,
             ),
@@ -245,8 +461,42 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorState({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined,
+                size: 48, color: AppColors.textLight),
+            const SizedBox(height: 12),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary)),
+            const SizedBox(height: 16),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue),
+              onPressed: onRetry,
+              child: const Text('Try again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyState extends StatelessWidget {
   final VoidCallback onPost;
+
   const _EmptyState({required this.onPost});
 
   @override
@@ -257,75 +507,36 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.forum_outlined,
-                size: 48, color: AppColors.textLight),
+            const Icon(
+              Icons.forum_outlined,
+              size: 48,
+              color: AppColors.textLight,
+            ),
             const SizedBox(height: 12),
-            const Text('No posts here yet',
-                style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700)),
+            const Text(
+              'No posts here yet',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 4),
-            const Text('Be the first to post in this area.',
-                style: TextStyle(color: AppColors.textSecondary)),
+            const Text(
+              'Be the first to post in this area.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+              ),
+            ),
             const SizedBox(height: 16),
             FilledButton(
               style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primaryBlue),
+                backgroundColor: AppColors.primaryBlue,
+              ),
               onPressed: onPost,
               child: const Text('Create post'),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AreaPickerSheet extends StatelessWidget {
-  final Suburb? selected;
-  final ValueChanged<Suburb?> onSelected;
-  const _AreaPickerSheet({required this.selected, required this.onSelected});
-
-  @override
-  Widget build(BuildContext context) {
-    const check = Icon(Icons.check, color: AppColors.primaryBlue);
-    return SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7),
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
-              child: Text('Choose your area',
-                  style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.public),
-              title: const Text('All areas'),
-              trailing: selected == null ? check : null,
-              onTap: () => onSelected(null),
-            ),
-            for (final city in communityRepo.cities)
-              ExpansionTile(
-                initiallyExpanded: selected?.city == city.name,
-                leading: const Icon(Icons.location_city),
-                title: Text(city.name),
-                children: [
-                  for (final s in city.suburbs)
-                    ListTile(
-                      contentPadding: const EdgeInsets.only(left: 72, right: 16),
-                      title: Text(s.name),
-                      trailing: selected?.id == s.id ? check : null,
-                      onTap: () => onSelected(s),
-                    ),
-                ],
-              ),
           ],
         ),
       ),

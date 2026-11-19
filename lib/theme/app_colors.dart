@@ -6,6 +6,10 @@ class AppColors {
   static const Color darkBlue = Color(0xFF0B3C5D);
   static const Color heroBlue = Color(0xFF0D4F78);
   static const Color lightBlue = Color(0xFFE8F3FB);
+  static const Color teal = Color(0xFF2BB3A3);
+  static const Color navy = Color(0xFF0B2545);
+  static const Color border = Color(0xFFDCE4EC);
+
 
   // Supporting colours
   static const Color success = Color(0xFF16A36A);

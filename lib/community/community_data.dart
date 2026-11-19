@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
@@ -11,12 +12,57 @@ class City {
   const City(this.name, this.suburbs);
 }
 
+/// One row of the areas table (a town, city, suburb or village).
 class Suburb {
   final String id;
   final String name;
+
+  /// The areas table's group_name: the town for a suburb, the province for a town.
   final String city;
-  const Suburb(this.id, this.name, this.city);
+  final String province;
+
+  /// 'city', 'town', 'village' or 'suburb' (the kind column).
+  final String kind;
+
+  const Suburb(this.id, this.name, this.city,
+      {this.province = '', this.kind = ''});
+
   String get label => '$name, $city';
+  bool get isTown => kind == 'city' || kind == 'town';
+  bool get isSuburbOrVillage => kind == 'suburb' || kind == 'village';
+
+  @override
+  bool operator ==(Object other) => other is Suburb && other.id == id;
+  @override
+  int get hashCode => id.hashCode;
+}
+
+/// Ids of every area inside the chosen province / town / suburb.
+/// Returns null when nothing is chosen (= show everything).
+Set<String>? areaIdsFor(
+  List<Suburb> areas, {
+  String? province,
+  Suburb? town,
+  Suburb? suburb,
+}) {
+  if (suburb != null) return {suburb.id};
+  if (town != null) {
+    return {
+      town.id,
+      for (final a in areas)
+        if (a.province == town.province &&
+            a.isSuburbOrVillage &&
+            a.city == town.name)
+          a.id,
+    };
+  }
+  if (province != null) {
+    return {
+      for (final a in areas)
+        if (a.province == province) a.id,
+    };
+  }
+  return null;
 }
 
 class AppUser {
@@ -24,11 +70,15 @@ class AppUser {
   final String name;
   final Color color;
   final bool verified;
+
+  /// Link to the profile picture (null = show the initials instead).
+  final String? avatarUrl;
   const AppUser({
     required this.id,
     required this.name,
     required this.color,
     this.verified = false,
+    this.avatarUrl,
   });
 
   String get initials {
@@ -38,34 +88,84 @@ class AppUser {
   }
 }
 
-enum PostCategory { missing, watch, safety, pets, meeting }
+/// A type of crime: one row of the crime_categories table in Supabase.
+class CrimeCategory {
+  final int id;
+  final String name;
+  final String description;
+  const CrimeCategory(this.id, this.name, this.description);
 
-extension PostCategoryInfo on PostCategory {
-  /// Short label used on the filter chips.
-  String get chipLabel => switch (this) {
-        PostCategory.missing => 'Missing',
-        PostCategory.watch => 'Watch',
-        PostCategory.safety => 'Safety',
-        PostCategory.pets => 'Pets',
-        PostCategory.meeting => 'Meetings',
-      };
+  /// The table has no colour column, so the tag colour is picked from the name.
+  Color get color {
+    final n = name.toLowerCase();
+    if (n.contains('violence') || n.contains('weapon') || n.contains('arson')) {
+      return AppColors.danger;
+    }
+    if (n.contains('theft') ||
+        n.contains('robbery') ||
+        n.contains('burglary') ||
+        n.contains('shoplifting') ||
+        n.contains('vehicle') ||
+        n.contains('bicycle')) {
+      return AppColors.warning;
+    }
+    if (n.contains('drug') ||
+        n.contains('antisocial') ||
+        n.contains('public order')) {
+      return AppColors.primaryBlue;
+    }
+    return AppColors.darkBlue;
+  }
 
-  /// Label used on the coloured tag on each card.
-  String get tagLabel => switch (this) {
-        PostCategory.missing => 'Missing Person',
-        PostCategory.watch => 'Neighbourhood Watch',
-        PostCategory.safety => 'Safety Announcement',
-        PostCategory.pets => 'Lost Pet',
-        PostCategory.meeting => 'Meeting',
-      };
+  // Categories are reloaded from the database, so compare them by id.
+  @override
+  bool operator ==(Object other) => other is CrimeCategory && other.id == id;
+  @override
+  int get hashCode => id.hashCode;
+}
 
-  Color get color => switch (this) {
-        PostCategory.missing => AppColors.danger,
-        PostCategory.watch => AppColors.darkBlue,
-        PostCategory.safety => AppColors.success,
-        PostCategory.pets => AppColors.warning,
-        PostCategory.meeting => AppColors.primaryBlue,
-      };
+enum AttachmentType { picture, document }
+
+/// "12 KB" / "3.4 MB"
+String formatFileSize(int bytes) {
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).ceil()} KB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
+
+/// The one picture or document a post can have.
+/// Right after the user picks a file it has [bytes] (in memory). Once it is
+/// saved in Supabase Storage, posts loaded from the database have a [url] instead.
+class PostAttachment {
+  final AttachmentType type;
+  final String name;
+  final int sizeBytes;
+  final Uint8List? bytes;
+  final String? url;
+  const PostAttachment({
+    required this.type,
+    required this.name,
+    required this.sizeBytes,
+    this.bytes,
+    this.url,
+  });
+
+  String get sizeLabel => formatFileSize(sizeBytes);
+
+  String get mimeType {
+    final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'pdf':
+        return 'application/pdf';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+    return 'application/octet-stream';
+  }
 }
 
 class Comment {
@@ -83,31 +183,30 @@ class Comment {
 
 class Post {
   final String id;
-  final String areaId;
+  final String? areaId; // null when the author chose 'Other'
+  final String? otherArea; // free-text town/village for 'Other'
   final AppUser author;
-  final PostCategory category;
+  final CrimeCategory category;
   final String title;
   final String body;
   final DateTime createdAt;
   final bool hasImage;
-  final Set<String> likedBy; // user ids
+  final PostAttachment? attachment;
   final List<Comment> comments;
 
   Post({
     required this.id,
-    required this.areaId,
+    this.areaId,
+    this.otherArea,
     required this.author,
     required this.category,
     required this.title,
     required this.body,
     required this.createdAt,
     this.hasImage = false,
-    Set<String>? likedBy,
+    this.attachment,
     List<Comment>? comments,
-  })  : likedBy = likedBy ?? <String>{},
-        comments = comments ?? <Comment>[];
-
-  int get likeCount => likedBy.length;
+  }) : comments = comments ?? <Comment>[];
 }
 
 const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -137,17 +236,30 @@ String formatPostTime(DateTime t) {
 // =====================================================================
 
 abstract class CommunityRepository extends ChangeNotifier {
+  /// Load data (areas, posts). The in-memory demo version has nothing to load.
+  Future<void> init() async {}
+  Future<void> refresh() async {}
+  bool get isLoading => false;
+  String? get errorMessage => null;
+
   AppUser get currentUser;
   List<City> get cities;
+
+  /// Every area as one flat list (for the province / town / suburb filters).
+  List<Suburb> get areas => [for (final c in cities) ...c.suburbs];
   Suburb? suburbById(String id);
-  List<Post> posts({Suburb? area, PostCategory? category});
+  List<CrimeCategory> get categories;
+  List<Post> posts({Set<String>? areaIds, CrimeCategory? category});
+
+  /// Pass either [area] or [otherArea] (free text, when the user chose 'Other').
   Future<void> addPost({
-    required Suburb area,
-    required PostCategory category,
+    Suburb? area,
+    String? otherArea,
+    required CrimeCategory category,
     required String title,
     required String body,
+    PostAttachment? attachment,
   });
-  Future<void> toggleLike(Post post);
   Future<void> addComment(Post post, String text);
 }
 
@@ -175,19 +287,37 @@ class InMemoryCommunityRepository extends CommunityRepository {
   @override
   AppUser get currentUser => me;
 
+  // Dummy areas, shaped like the areas table (province > town > suburb).
   static const _cities = [
+    City('Free State', [
+      Suburb('fs-bloemfontein', 'Bloemfontein', 'Free State',
+          province: 'Free State', kind: 'town'),
+    ]),
     City('Bloemfontein', [
-      Suburb('bfn-heidedal', 'Heidedal', 'Bloemfontein'),
-      Suburb('bfn-universitas', 'Universitas', 'Bloemfontein'),
-      Suburb('bfn-langenhoven', 'Langenhoven Park', 'Bloemfontein'),
-      Suburb('bfn-pentagon', 'Pentagon Park', 'Bloemfontein'),
+      Suburb('bfn-heidedal', 'Heidedal', 'Bloemfontein',
+          province: 'Free State', kind: 'suburb'),
+      Suburb('bfn-universitas', 'Universitas', 'Bloemfontein',
+          province: 'Free State', kind: 'suburb'),
+      Suburb('bfn-langenhoven', 'Langenhoven Park', 'Bloemfontein',
+          province: 'Free State', kind: 'suburb'),
+      Suburb('bfn-pentagon', 'Pentagon Park', 'Bloemfontein',
+          province: 'Free State', kind: 'suburb'),
+    ]),
+    City('Gauteng', [
+      Suburb('gp-johannesburg', 'Johannesburg', 'Gauteng',
+          province: 'Gauteng', kind: 'town'),
     ]),
     City('Johannesburg', [
-      Suburb('jhb-soweto', 'Soweto', 'Johannesburg'),
-      Suburb('jhb-sandton', 'Sandton', 'Johannesburg'),
-      Suburb('jhb-randburg', 'Randburg', 'Johannesburg'),
-      Suburb('jhb-eldorado', 'Eldorado Park', 'Johannesburg'),
-      Suburb('jhb-florida', 'Florida Park', 'Johannesburg'),
+      Suburb('jhb-soweto', 'Soweto', 'Johannesburg',
+          province: 'Gauteng', kind: 'suburb'),
+      Suburb('jhb-sandton', 'Sandton', 'Johannesburg',
+          province: 'Gauteng', kind: 'suburb'),
+      Suburb('jhb-randburg', 'Randburg', 'Johannesburg',
+          province: 'Gauteng', kind: 'suburb'),
+      Suburb('jhb-eldorado', 'Eldorado Park', 'Johannesburg',
+          province: 'Gauteng', kind: 'suburb'),
+      Suburb('jhb-florida', 'Florida Park', 'Johannesburg',
+          province: 'Gauteng', kind: 'suburb'),
     ]),
   ];
 
@@ -209,18 +339,40 @@ class InMemoryCommunityRepository extends CommunityRepository {
     return DateTime(n.year, n.month, n.day - daysAgo, hour, minute);
   }
 
+  // Same types as the crime_categories table (used only for the dummy data).
+  static const _categories = [
+    CrimeCategory(1, 'Antisocial Behavior', 'Suspicious behavior from individual'),
+    CrimeCategory(2, 'Bicycle Theft', 'Stolen bicycle'),
+    CrimeCategory(3, 'Burglary', 'Unlawful entry into a property'),
+    CrimeCategory(4, 'Criminal Damage & Arson', 'Vandalism and attempts of combustion'),
+    CrimeCategory(5, 'Drugs', 'Drug use'),
+    CrimeCategory(6, 'Other Crime', 'Other crimes not mentioned in the crime categories'),
+    CrimeCategory(7, 'Other Theft', 'Other theft not mentioned in crime categories'),
+    CrimeCategory(8, 'Possession of Weapons', 'Persons have weapons on them'),
+    CrimeCategory(9, 'Public Order', 'Disorderly conduct and disturbing peace'),
+    CrimeCategory(10, 'Robbery', 'Persons stealing others belongings'),
+    CrimeCategory(11, 'Shoplifting', 'Persons stealing items from within stores'),
+    CrimeCategory(12, 'Theft from Person', 'Stealing items directly from a person'),
+    CrimeCategory(13, 'Vehicle Crime', 'Crimes done upon vehicles'),
+    CrimeCategory(14, 'Violence & Sexual Offences', 'Assault and GBV'),
+  ];
+
+  @override
+  List<CrimeCategory> get categories => _categories;
+
+  CrimeCategory _c(int id) => _categories.firstWhere((c) => c.id == id);
+
   late final List<Post> _posts = [
     Post(
       id: 'p1',
       areaId: 'jhb-soweto',
       author: nomsa,
-      category: PostCategory.missing,
+      category: _c(6),
       title: 'Missing: Thabo Dlamini, 14 years old',
       body:
           'Last seen near Protea Glen Mall on Friday evening wearing blue school uniform. If seen please call 082 555 0123.',
       createdAt: _at(0, 9, 15),
       hasImage: true,
-      likedBy: {'a', 'b', 'c', 'd'},
       comments: [
         Comment(
             id: 'c1',
@@ -233,52 +385,48 @@ class InMemoryCommunityRepository extends CommunityRepository {
       id: 'p2',
       areaId: 'jhb-eldorado',
       author: watchGroup,
-      category: PostCategory.watch,
+      category: _c(1),
       title: 'Patrol schedule – this week',
       body:
           'Patrols run nightly 20:00–02:00. Volunteers needed for Wednesday and Friday shifts. Reply here to sign up.',
       createdAt: _at(1, 18, 40),
-      likedBy: {'a', 'b'},
     ),
     Post(
       id: 'p3',
       areaId: 'jhb-florida',
       author: priya,
-      category: PostCategory.pets,
+      category: _c(7),
       title: 'Lost – golden retriever named Biscuit',
       body:
           'Missing from Florida Park since Sunday morning. Microchipped and wearing red collar. Reward offered.',
       createdAt: _at(3, 14, 20),
       hasImage: true,
-      likedBy: {'a'},
     ),
     Post(
       id: 'p4',
       areaId: 'jhb-sandton',
       author: metro,
-      category: PostCategory.safety,
+      category: _c(13),
       title: 'Vehicle break-ins: keep valuables out of sight',
       body:
           'We have seen an increase in smash-and-grab incidents around Sandton CBD. Do not leave bags or phones visible in parked cars.',
       createdAt: _at(4, 8, 0),
-      likedBy: {'a', 'b', 'c'},
     ),
     Post(
       id: 'p5',
       areaId: 'bfn-heidedal',
       author: thabo,
-      category: PostCategory.watch,
+      category: _c(1),
       title: 'Suspicious vehicle near Heidedal main road',
       body:
           'White bakkie with no number plates driving slowly past houses around 19:00. Please lock gates and report to SAPS if you see it.',
       createdAt: _at(5, 19, 30),
-      likedBy: {'a'},
     ),
     Post(
       id: 'p6',
       areaId: 'bfn-universitas',
       author: watchGroup,
-      category: PostCategory.meeting,
+      category: _c(9),
       title: 'Neighbourhood meeting – Thursday 18:00',
       body:
           'Open meeting at the community hall to discuss street lighting and the new alert system. Everyone is welcome.',
@@ -287,9 +435,10 @@ class InMemoryCommunityRepository extends CommunityRepository {
   ];
 
   @override
-  List<Post> posts({Suburb? area, PostCategory? category}) {
+  List<Post> posts({Set<String>? areaIds, CrimeCategory? category}) {
     final result = _posts.where((p) {
-      final areaOk = area == null || p.areaId == area.id;
+      final areaOk =
+          areaIds == null || (p.areaId != null && areaIds.contains(p.areaId));
       final categoryOk = category == null || p.category == category;
       return areaOk && categoryOk;
     }).toList();
@@ -299,28 +448,24 @@ class InMemoryCommunityRepository extends CommunityRepository {
 
   @override
   Future<void> addPost({
-    required Suburb area,
-    required PostCategory category,
+    Suburb? area,
+    String? otherArea,
+    required CrimeCategory category,
     required String title,
     required String body,
+    PostAttachment? attachment,
   }) async {
     _posts.add(Post(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
-      areaId: area.id,
+      areaId: area?.id,
+      otherArea: otherArea,
       author: currentUser,
       category: category,
       title: title,
       body: body,
       createdAt: DateTime.now(),
+      attachment: attachment,
     ));
-    notifyListeners();
-  }
-
-  @override
-  Future<void> toggleLike(Post post) async {
-    if (!post.likedBy.remove(currentUser.id)) {
-      post.likedBy.add(currentUser.id);
-    }
     notifyListeners();
   }
 
@@ -337,5 +482,5 @@ class InMemoryCommunityRepository extends CommunityRepository {
 }
 
 /// One shared instance used by all screens.
-/// Later: final CommunityRepository communityRepo = SupabaseCommunityRepository();
-final CommunityRepository communityRepo = InMemoryCommunityRepository();
+/// main.dart swaps in SupabaseCommunityRepository once the Supabase details are filled in.
+CommunityRepository communityRepo = InMemoryCommunityRepository();

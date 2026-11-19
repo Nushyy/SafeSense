@@ -1,20 +1,31 @@
+﻿import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'features/auth/screens/login_screen.dart';
-
+import 'community/community_data.dart';
+import 'community/supabase_community_repository.dart';
+import 'config/supabase_config.dart';
 import 'core/theme/app_theme.dart';
+import 'features/auth/screens/login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await dotenv.load(fileName: '.env');
 
+  if (!SupabaseConfig.isConfigured) {
+    throw Exception('Supabase configuration is missing or invalid.');
+  }
+
   await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL']!,
-    publishableKey: dotenv.env['SUPABASE_PUBLISHABLE_KEY']!,
+    url: SupabaseConfig.url,
+    publishableKey: SupabaseConfig.anonKey,
   );
+
+  communityRepo = SupabaseCommunityRepository();
+  unawaited(communityRepo.init());
 
   runApp(const MyApp());
 }
